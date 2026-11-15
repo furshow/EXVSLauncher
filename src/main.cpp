@@ -19,6 +19,7 @@
 #include <dinput.h>
 
 #include <algorithm>
+#include <cmath>
 #include <atomic>
 #include <mutex>
 #include <string>
@@ -33,7 +34,7 @@
 #include "overlay_version.h"   // OVERLAY_BUNDLED_VERSION, generated from ../EXVSOverlay/src/menu.h
 
 using json = nlohmann::json;
-static const char *VERSION = "1.0.0";
+static const char *VERSION = "1.1.0";
 
 // ---------------------------------------------------------------------------------------------
 // strings / paths
@@ -171,7 +172,6 @@ static std::string g_busy;
 static std::vector<std::string> g_log;          // N2N log lines
 static std::atomic<bool> g_n2n_running{false}, g_n2n_connected{false};
 static std::string g_n2n_ip;
-static HANDLE g_edge_proc;
 static void set_busy(const std::string &s) { std::lock_guard<std::mutex> l(g_mx); g_busy = s; }
 static void n2n_log(const std::string &s) {
     std::lock_guard<std::mutex> l(g_mx);
@@ -667,6 +667,107 @@ static std::wstring quote_arg(const std::string &s) {
     return o + L"\"";
 }
 
+// The launcher runs without administrator rights. Only N2N needs them (edge.exe sets up the TAP adapter, and the
+// adapter's IP and metric are changed with netsh / Set-NetIPInterface), so N2N runs in a helper: this same exe
+// started elevated with --n2n-helper (one UAC prompt per connect). The helper reads its request from a named pipe
+// the launcher creates, runs edge.exe and sends its output back through the pipe. The launcher can't touch an
+// elevated process, so it stops N2N through a named event. If the launcher is closed while the game runs, the
+// helper keeps N2N up (an online match must not drop) and stops it when the game closes.
+static const wchar_t *N2N_STOP_EVENT = L"Local\\EXVSLauncher.N2NStop";
+static const wchar_t *g_n2n_verb = L"runas";   // --n2n-test uses "open" (no UAC prompt)
+static HANDLE n2n_stop_event() {
+    static HANDLE ev = CreateEventW(NULL, TRUE, FALSE, N2N_STOP_EVENT);
+    return ev;
+}
+static bool edge_line_connected(const std::string &line) { return line.find("edge <<< ================ >>> supernode") != std::string::npos; }
+
+// synchronous read/write on an overlapped pipe handle
+static bool pipe_io(HANDLE h, bool write, void *buf, DWORD len, DWORD *done) {
+    OVERLAPPED ov = {}; ov.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+    BOOL ok = write ? WriteFile(h, buf, len, NULL, &ov) : ReadFile(h, buf, len, NULL, &ov);
+    if (!ok && GetLastError() != ERROR_IO_PENDING) { CloseHandle(ov.hEvent); return false; }
+    ok = GetOverlappedResult(h, &ov, done, TRUE);
+    CloseHandle(ov.hEvent);
+    return ok && *done > 0;
+}
+
+static void init_dir(const wchar_t *override_dir);
+static HWND g_hwnd;   // main window (parent of the UAC prompt)
+static int n2n_helper(const wchar_t *dir, const wchar_t *pipe_name, DWORD launcher_pid) {
+    init_dir(dir);
+    HANDLE p = INVALID_HANDLE_VALUE;
+    for (int i = 0; i < 50 && p == INVALID_HANDLE_VALUE; i++) {
+        p = CreateFileW(pipe_name, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+        if (p == INVALID_HANDLE_VALUE) { if (GetLastError() == ERROR_PIPE_BUSY) WaitNamedPipeW(pipe_name, 2000); else Sleep(100); }
+    }
+    if (p == INVALID_HANDLE_VALUE) return 2;
+    ULONG server = 0;   // only take requests from the launcher that started this helper
+    if (!GetNamedPipeServerProcessId(p, &server) || server != launcher_pid) { CloseHandle(p); return 3; }
+    auto say = [p](const std::string &s) { std::string l = s + "\n"; DWORD w; WriteFile(p, l.data(), (DWORD)l.size(), &w, NULL); };
+
+    std::string req; char c; DWORD n;
+    while (req.size() < 65536 && ReadFile(p, &c, 1, &n, NULL) && n && c != '\n') req += c;
+    json j = json::parse(req, nullptr, false);
+    std::string iface = j.is_object() ? j.value("iface", "") : "";
+    if (iface.empty() || iface.find_first_of("'\"") != std::string::npos) { say("[N2N helper] bad request"); CloseHandle(p); return 4; }
+    if (j.value("dhcp", false)) run_hidden_wait(L"netsh interface ip set address name=" + quote_arg(iface) + L" source=dhcp", 15000);
+
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+    HANDLE rd, wr;
+    if (!CreatePipe(&rd, &wr, &sa, 0)) { say("[N2N helper] could not create a pipe"); CloseHandle(p); return 5; }
+    SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
+    std::wstring cmd = L"\"" + path_of(L"edge.exe") + L"\" " + widen(j.value("args", ""));
+    STARTUPINFOW si = { sizeof(si) }; si.dwFlags = STARTF_USESTDHANDLES; si.hStdOutput = wr; si.hStdError = wr; si.hStdInput = NULL;
+    PROCESS_INFORMATION pi;
+    if (!CreateProcessW(NULL, &cmd[0], NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, g_dir.c_str(), &si, &pi)) {
+        say("[N2N helper] could not start edge.exe (error " + std::to_string(GetLastError()) + ")");
+        CloseHandle(rd); CloseHandle(wr); CloseHandle(p); return 6;
+    }
+    CloseHandle(wr); CloseHandle(pi.hThread);
+
+    std::thread reader([rd, &say, iface] {   // edge output -> launcher; set the adapter metric once connected
+        std::string acc; char buf[1024]; DWORD got; bool metric = false;
+        while (ReadFile(rd, buf, sizeof(buf), &got, NULL) && got) {
+            acc.append(buf, got);
+            size_t q;
+            while ((q = acc.find('\n')) != std::string::npos) {
+                std::string line = trim(acc.substr(0, q)); acc.erase(0, q + 1);
+                if (line.empty()) continue;
+                say(line);
+                if (!metric && edge_line_connected(line)) {
+                    metric = true;   // prefer the N2N adapter for game traffic (SnowLauncher sets its metric to 1)
+                    run_hidden_wait(L"powershell -NoProfile -Command \"Set-NetIPInterface -InterfaceAlias '" + widen(iface) +
+                                    L"' -AddressFamily IPv4 -InterfaceMetric 1\"", 15000);
+                }
+            }
+        }
+        CloseHandle(rd);
+    });
+
+    HANDLE stop = OpenEventW(SYNCHRONIZE, FALSE, N2N_STOP_EVENT);
+    HANDLE launcher = OpenProcess(SYNCHRONIZE, FALSE, launcher_pid);
+    bool orphan = false;
+    for (;;) {
+        std::vector<HANDLE> hs = { pi.hProcess };
+        if (stop) hs.push_back(stop);
+        if (launcher && !orphan) hs.push_back(launcher);
+        DWORD r = WaitForMultipleObjects((DWORD)hs.size(), hs.data(), FALSE, orphan ? 2000 : INFINITE);
+        if (r == WAIT_TIMEOUT) { if (!game_running()) { TerminateProcess(pi.hProcess, 0); break; } continue; }
+        if (r == WAIT_FAILED || r == WAIT_OBJECT_0) break;   // edge exited
+        HANDLE h = hs[r - WAIT_OBJECT_0];
+        if (h == stop) { say("[N2N] stopped from the launcher"); TerminateProcess(pi.hProcess, 0); break; }
+        orphan = true;   // launcher closed: keep N2N while the game runs
+        if (!game_running()) { TerminateProcess(pi.hProcess, 0); break; }
+    }
+    WaitForSingleObject(pi.hProcess, 5000);
+    reader.join();
+    CloseHandle(pi.hProcess);
+    if (stop) CloseHandle(stop);
+    if (launcher) CloseHandle(launcher);
+    CloseHandle(p);
+    return 0;
+}
+
 static json n2n_start(const json &state) {
     if (g_n2n_running) return { {"ok", false}, {"error", "N2N is already running"} };
     const json &n = state.at("n2n");
@@ -676,9 +777,9 @@ static json n2n_start(const json &state) {
     if (community.empty()) return { {"ok", false}, {"error", "Enter the community (room) name"} };
     if (name.empty()) return { {"ok", false}, {"error", "Enter a player name"} };
     if (iface.empty()) return { {"ok", false}, {"error", "Choose the TAP adapter"} };
+    if (iface.find_first_of("'\"") != std::string::npos) return { {"ok", false}, {"error", "The adapter name can't contain quotes"} };
     bool dhcp = jb(n, "dhcp", true);
 
-    if (dhcp) run_hidden_wait(L"netsh interface ip set address name=" + quote_arg(iface) + L" source=dhcp", 15000);
     std::wstring args = L"-l " + quote_arg(host) + L" -c " + quote_arg(community);
     if (jb(n, "relay", false)) args += L" -S1";
     if (jb(n, "noPortForwarding", false)) args += L" --no-port-forwarding";
@@ -688,27 +789,65 @@ static json n2n_start(const json &state) {
     std::string extra = trim(js(n, "conf"));
     if (!extra.empty()) args += L" " + widen(extra);
 
-    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
-    HANDLE rd, wr;
-    if (!CreatePipe(&rd, &wr, &sa, 0)) return { {"ok", false}, {"error", "Could not create a pipe"} };
-    SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
-    std::wstring cmd = L"\"" + path_of(L"edge.exe") + L"\" " + args;
-    STARTUPINFOW si = { sizeof(si) }; si.dwFlags = STARTF_USESTDHANDLES; si.hStdOutput = wr; si.hStdError = wr; si.hStdInput = NULL;
-    PROCESS_INFORMATION pi;
-    if (!CreateProcessW(NULL, &cmd[0], NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, g_dir.c_str(), &si, &pi)) {
-        CloseHandle(rd); CloseHandle(wr);
-        return { {"ok", false}, {"error", "Could not start edge.exe"} };
+    // N2N left running by an earlier launcher (closed during a match): stop it first, two edges can't share the adapter
+    HANDLE stop_ev = n2n_stop_event();
+    if (!find_procs(L"edge.exe", true).empty()) {
+        SetEvent(stop_ev);
+        for (int i = 0; i < 30 && !find_procs(L"edge.exe", true).empty(); i++) Sleep(100);
+        kill_procs(L"edge.exe", true);   // one this launcher can close (not elevated)
     }
-    CloseHandle(wr); CloseHandle(pi.hThread);
-    g_edge_proc = pi.hProcess; g_n2n_running = true; g_n2n_connected = false;
+    ResetEvent(stop_ev);
+
+    std::wstring pipe_name = L"\\\\.\\pipe\\EXVSLauncher.n2n." + std::to_wstring(GetCurrentProcessId()) + L"." + std::to_wstring(GetTickCount());
+    HANDLE pipe = CreateNamedPipeW(pipe_name.c_str(), PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+                                   PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS, 1, 4096, 4096, 0, NULL);
+    if (pipe == INVALID_HANDLE_VALUE) return { {"ok", false}, {"error", "Could not create a pipe"} };
+
+    wchar_t self[MAX_PATH]; GetModuleFileNameW(NULL, self, MAX_PATH);
+    std::wstring params = L"--n2n-helper \"" + g_dir.substr(0, g_dir.size() - 1) + L"\" " + pipe_name + L" " + std::to_wstring(GetCurrentProcessId());
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    SHELLEXECUTEINFOW se = { sizeof(se) };
+    se.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    se.hwnd = g_hwnd; se.lpVerb = g_n2n_verb; se.lpFile = self; se.lpParameters = params.c_str(); se.nShow = SW_HIDE;
+    BOOL launched = ShellExecuteExW(&se);
+    DWORD err = GetLastError();
+    CoUninitialize();
+    if (!launched) {
+        CloseHandle(pipe);
+        log_line("n2n: helper not started (%lu)", err);
+        if (err == ERROR_CANCELLED) return { {"ok", false}, {"error", "N2N needs administrator rights: accept the Windows prompt to connect"} };
+        return { {"ok", false}, {"error", "Could not start the N2N helper (error " + std::to_string(err) + ")"} };
+    }
+
+    // wait for the helper to connect (or to die)
+    OVERLAPPED ov = {}; ov.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+    bool connected = ConnectNamedPipe(pipe, &ov) != FALSE;
+    err = GetLastError();
+    if (!connected && err == ERROR_PIPE_CONNECTED) connected = true;
+    else if (!connected && err == ERROR_IO_PENDING) {
+        HANDLE hs[2] = { ov.hEvent, se.hProcess };
+        DWORD r = WaitForMultipleObjects(se.hProcess ? 2 : 1, hs, FALSE, 20000);
+        DWORD x;
+        if (r != WAIT_OBJECT_0) CancelIoEx(pipe, &ov);
+        connected = GetOverlappedResult(pipe, &ov, &x, TRUE) != FALSE && r == WAIT_OBJECT_0;
+    }
+    CloseHandle(ov.hEvent);
+    if (se.hProcess) CloseHandle(se.hProcess);
+    std::string req = json({ {"iface", iface}, {"dhcp", dhcp}, {"args", narrow(args)} }).dump() + "\n";
+    DWORD w;
+    if (!connected || !pipe_io(pipe, true, &req[0], (DWORD)req.size(), &w)) {
+        CloseHandle(pipe);
+        return { {"ok", false}, {"error", "The N2N helper did not start"} };
+    }
+
+    g_n2n_running = true; g_n2n_connected = false;
     { std::lock_guard<std::mutex> l(g_mx); g_n2n_ip.clear(); }
     n2n_log("> edge " + narrow(args));
     log_line("n2n: edge %s", narrow(args).c_str());
 
-    std::string iface_copy = iface;
-    std::thread([rd, iface_copy] {
+    std::thread([pipe] {
         std::string acc; char buf[1024]; DWORD n;
-        while (ReadFile(rd, buf, sizeof(buf), &n, NULL) && n) {
+        while (pipe_io(pipe, false, buf, sizeof(buf), &n)) {
             acc.append(buf, n);
             size_t p;
             while ((p = acc.find('\n')) != std::string::npos) {
@@ -717,26 +856,19 @@ static json n2n_start(const json &state) {
                 n2n_log(line);
                 size_t k = line.find("created local tap device IP:");
                 if (k != std::string::npos) { std::lock_guard<std::mutex> l(g_mx); g_n2n_ip = trim(line.substr(k + 28)); g_n2n_ip = g_n2n_ip.substr(0, g_n2n_ip.find_first_of(" ,")); }
-                if (line.find("[OK] edge <<< ================ >>> supernode") != std::string::npos ||
-                    line.find("edge <<< ================ >>> supernode") != std::string::npos) {
-                    if (!g_n2n_connected.exchange(true)) {
-                        // prefer the N2N adapter for game traffic (SnowLauncher sets its metric to 1)
-                        std::wstring ps = L"powershell -NoProfile -Command \"Set-NetIPInterface -InterfaceAlias '" + widen(iface_copy) +
-                                          L"' -AddressFamily IPv4 -InterfaceMetric 1\"";
-                        run_hidden_wait(ps, 15000);
-                    }
-                }
+                if (edge_line_connected(line)) g_n2n_connected = true;
             }
         }
-        CloseHandle(rd);
+        CloseHandle(pipe);
         g_n2n_running = false; g_n2n_connected = false;
         n2n_log("[Disconnected]");
     }).detach();
     return { {"ok", true} };
 }
 static void n2n_stop() {
-    if (g_edge_proc) { TerminateProcess(g_edge_proc, 0); CloseHandle(g_edge_proc); g_edge_proc = NULL; }
-    kill_procs(L"edge.exe", true);
+    SetEvent(n2n_stop_event());          // the elevated helper stops edge.exe
+    for (int i = 0; i < 20 && !find_procs(L"edge.exe", true).empty(); i++) Sleep(100);
+    kill_procs(L"edge.exe", true);      // fallback for an edge.exe this launcher may close itself
 }
 
 static std::wstring server_exe() {
@@ -753,7 +885,7 @@ static bool server_running() {
 // Controllers (DirectInput): list devices and capture a button number for the mapping UI
 // ---------------------------------------------------------------------------------------------
 static IDirectInput8W *g_di;
-static HWND g_hwnd;
+// g_hwnd is declared with the N2N helper
 static std::atomic<bool> g_capture_cancel{false};
 struct DevInfo { GUID guid; std::string name; };
 static BOOL CALLBACK enum_dev_cb(LPCDIDEVICEINSTANCEW d, LPVOID ctx) {
@@ -766,6 +898,43 @@ static std::vector<DevInfo> list_devices() {
     g_di->EnumDevices(DI8DEVCLASS_GAMECTRL, enum_dev_cb, &v, DIEDFL_ATTACHEDONLY);
     return v;
 }
+// XInput backup for Xbox pads: on some PCs DirectInput opens an Xbox controller but never gets a press in the
+// launcher. Buttons are numbered like DirectInput numbers them for an Xbox pad (A 1, B 2, X 3, Y 4, LB 5, RB 6,
+// Back 7, Start 8, LS 9, RS 10), so the mapping stays the same. The system DLL is loaded by full path: the game
+// folder has the overlay's xinput9_1_0.dll proxy.
+struct XPad { WORD buttons; BYTE lt, rt; SHORT lx, ly, rx, ry; };
+struct XState { DWORD packet; XPad pad; };
+typedef DWORD(WINAPI *XInputGetState_t)(DWORD, XState *);
+static XInputGetState_t xinput_get() {
+    static XInputGetState_t fn = [] {
+        HMODULE m = LoadLibraryExW(L"xinput1_4.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (!m) m = LoadLibraryExW(L"xinput1_3.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        return m ? (XInputGetState_t)GetProcAddress(m, "XInputGetState") : (XInputGetState_t)NULL;
+    }();
+    return fn;
+}
+struct XRead { bool connected = false; std::vector<int> buttons; int pov = -1; int x = 0, y = 0; };
+static XRead xinput_read() {   // every connected XInput pad together
+    XRead r;
+    auto get = xinput_get(); if (!get) return r;
+    static const WORD bits[] = { 0x1000, 0x2000, 0x4000, 0x8000, 0x0100, 0x0200, 0x0020, 0x0010, 0x0040, 0x0080 };
+    bool held[10] = {};
+    WORD dpad = 0;
+    for (DWORD i = 0; i < 4; i++) {
+        XState s = {};
+        if (get(i, &s) != ERROR_SUCCESS) continue;
+        r.connected = true;
+        for (int b = 0; b < 10; b++) if (s.pad.buttons & bits[b]) held[b] = true;
+        dpad |= s.pad.buttons & 0x000F;
+        if (abs(s.pad.lx) > abs(r.x * 32)) r.x = s.pad.lx * 1000 / 32767;
+        if (abs(s.pad.ly) > abs(r.y * 32)) r.y = -s.pad.ly * 1000 / 32767;
+    }
+    for (int b = 0; b < 10; b++) if (held[b]) r.buttons.push_back(b + 1);
+    int dx = (dpad & 8 ? 1 : 0) - (dpad & 4 ? 1 : 0), dy = (dpad & 2 ? 1 : 0) - (dpad & 1 ? 1 : 0);
+    if (dx || dy) r.pov = ((int)lround(atan2((double)dx, (double)-dy) * 180.0 / 3.14159265358979) + 360) % 360;
+    return r;
+}
+
 // Listens to every attached controller at once and returns the first button pressed, with the name of the
 // controller it came from (the UI switches the device to it: the loader finds the pad by that name).
 // Watching only the selected device failed when its name didn't match (e.g. a GP2040-CE in PS3 mode plugged
@@ -788,12 +957,23 @@ static json capture_button(const std::string &name, int timeout_ms) {
         dev->Poll(); dev->GetDeviceState(sizeof(o.base), &o.base);
         open.push_back(o);
     }
-    if (open.empty()) return { {"error", "Could not open the controller"} };
-    log_line("capture: listening to %zu controller(s), selected '%s'", open.size(), name.c_str());
+    std::string xbox_name;   // an Xbox device in the list: its presses can also come from XInput
+    for (auto &d : devs) if (pad_is_xinput(d.name)) { xbox_name = (pad_is_xinput(name) ? name : d.name); break; }
+    if (open.empty() && xbox_name.empty()) return { {"error", "Could not open the controller"} };
+    log_line("capture: listening to %zu controller(s), selected '%s'%s", open.size(), name.c_str(), xbox_name.empty() ? "" : " (+XInput)");
     json result = { {"error", "No button pressed"} };
     g_capture_cancel = false;
+    std::vector<int> xbase = xbox_name.empty() ? std::vector<int>() : xinput_read().buttons;
     for (int t = 0; t < timeout_ms / 15 && !g_capture_cancel && result.contains("error"); t++) {
         Sleep(15);
+        if (!xbox_name.empty()) {
+            std::vector<int> now = xinput_read().buttons;
+            for (int b : now) if (std::find(xbase.begin(), xbase.end(), b) == xbase.end()) {
+                result = { {"button", b}, {"device", xbox_name} }; log_line("capture: button %d on '%s' (XInput)", b, xbox_name.c_str()); break;
+            }
+            xbase = now;   // released buttons can be pressed again
+            if (!result.contains("error")) break;
+        }
         for (auto &o : open) {
             DIJOYSTATE2 st;
             if (FAILED(o.dev->Poll())) o.dev->Acquire();
@@ -810,6 +990,62 @@ static json capture_button(const std::string &name, int timeout_ms) {
     if (g_capture_cancel) result = { {"cancelled", true} };
     for (auto &o : open) { o.dev->Unacquire(); o.dev->Release(); }
     return result;
+}
+
+// Input tester: live state of one controller (buttons held, D-pad/POV, left stick), polled by the UI ~30 times
+// a second. The device stays open between polls; padRelease closes it when the tester stops.
+static std::mutex g_pad_mtx;
+static IDirectInputDevice8W *g_pad_dev;
+static std::string g_pad_name;
+static DWORD g_pad_retry;   // GetTickCount() before which a missing device is not searched again
+static void pad_close() {
+    if (g_pad_dev) { g_pad_dev->Unacquire(); g_pad_dev->Release(); g_pad_dev = NULL; }
+    g_pad_name.clear();
+}
+static json pad_state_di(const std::string &name);
+static json pad_state(const std::string &name) {
+    json r = pad_state_di(name);
+    if (!pad_is_xinput(name)) return r;
+    XRead x = xinput_read();   // Xbox pad: add what XInput sees (DirectInput may get nothing)
+    if (!x.connected) return r;
+    std::vector<int> b = x.buttons;
+    if (r.value("connected", false)) for (auto &v : r["buttons"]) if (std::find(b.begin(), b.end(), v.get<int>()) == b.end()) b.push_back(v.get<int>());
+    std::sort(b.begin(), b.end());
+    int pov = x.pov >= 0 ? x.pov : r.value("pov", -1);
+    int sx = abs(x.x) > abs(r.value("x", 0)) ? x.x : r.value("x", 0), sy = abs(x.y) > abs(r.value("y", 0)) ? x.y : r.value("y", 0);
+    return { {"connected", true}, {"buttons", b}, {"pov", pov}, {"x", sx}, {"y", sy} };
+}
+static json pad_state_di(const std::string &name) {
+    std::lock_guard<std::mutex> lk(g_pad_mtx);
+    if (g_pad_dev && g_pad_name != name) pad_close();
+    if (!g_pad_dev) {
+        if (GetTickCount() < g_pad_retry) return { {"connected", false} };
+        g_pad_retry = GetTickCount() + 1500;
+        auto devs = list_devices();
+        const DevInfo *pick = NULL;
+        for (auto &d : devs) if (d.name == name) { pick = &d; break; }
+        if (!pick && name.empty() && !devs.empty()) pick = &devs[0];
+        if (!pick) return { {"connected", false} };
+        IDirectInputDevice8W *dev = NULL;
+        if (FAILED(g_di->CreateDevice(pick->guid, &dev, NULL))) return { {"connected", false} };
+        if (FAILED(dev->SetDataFormat(&c_dfDIJoystick2))) { dev->Release(); return { {"connected", false} }; }
+        if (FAILED(dev->SetCooperativeLevel(g_hwnd, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE)))
+            dev->SetCooperativeLevel(NULL, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+        for (DWORD axis : { (DWORD)DIJOFS_X, (DWORD)DIJOFS_Y }) {   // sticks report -1000..1000
+            DIPROPRANGE r = {}; r.diph.dwSize = sizeof(r); r.diph.dwHeaderSize = sizeof(r.diph);
+            r.diph.dwHow = DIPH_BYOFFSET; r.diph.dwObj = axis; r.lMin = -1000; r.lMax = 1000;
+            dev->SetProperty(DIPROP_RANGE, &r.diph);
+        }
+        dev->Acquire();
+        g_pad_dev = dev; g_pad_name = name;
+    }
+    DIJOYSTATE2 st;
+    if (FAILED(g_pad_dev->Poll())) g_pad_dev->Acquire();
+    if (FAILED(g_pad_dev->GetDeviceState(sizeof(st), &st))) { pad_close(); return { {"connected", false} }; }   // unplugged
+    json b = json::array();
+    for (int i = 0; i < 128; i++) if (st.rgbButtons[i] & 0x80) b.push_back(i + 1);
+    int pov = LOWORD(st.rgdwPOV[0]) == 0xFFFF ? -1 : (int)(st.rgdwPOV[0] / 100);   // degrees, -1 = centred
+    return { {"connected", true}, {"buttons", b}, {"pov", pov}, {"x", st.lX}, {"y", st.lY} };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -883,11 +1119,37 @@ static int selftest(const wchar_t *dir, const wchar_t *out) {
     return 0;
 }
 
+static int n2n_test(const wchar_t *dir, const wchar_t *out) {
+    // --n2n-test <game dir> <out.json>: connect and disconnect N2N through the helper without the UAC prompt
+    // (the helper runs unelevated, so use it with a stand-in edge.exe), no window
+    init_dir(dir);
+    g_n2n_verb = L"open";
+    json st = { {"n2n", { {"host", "127.0.0.1:7654"}, {"community", "test room"}, {"playerName", "tester"}, {"iface", "N2N"},
+                          {"dhcp", false}, {"relay", true}, {"multicast", true}, {"virtualIp", "10.0.0.9"} }} };
+    json r;
+    r["start"] = n2n_start(st);
+    for (int i = 0; i < 100 && g_n2n_running && !g_n2n_connected; i++) Sleep(100);
+    r["connected"] = (bool)g_n2n_connected;
+    { std::lock_guard<std::mutex> l(g_mx); r["ip"] = g_n2n_ip; }
+    r["edgeRunning"] = !find_procs(L"edge.exe", true).empty();
+    n2n_stop();
+    for (int i = 0; i < 100 && g_n2n_running; i++) Sleep(100);
+    r["runningAfterStop"] = (bool)g_n2n_running;
+    r["edgeAfterStop"] = !find_procs(L"edge.exe", true).empty();
+    { std::lock_guard<std::mutex> l(g_mx); r["log"] = g_log; }
+    FILE *f = _wfopen(out, L"wb");
+    if (!f) return 2;
+    std::string t = r.dump(2); fwrite(t.data(), 1, t.size(), f); fclose(f);
+    return 0;
+}
+
 static HANDLE g_mtx;   // single instance
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     int argc; wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argc >= 4 && wcscmp(argv[1], L"--selftest") == 0) return selftest(argv[2], argv[3]);
+    if (argc >= 5 && wcscmp(argv[1], L"--n2n-helper") == 0) return n2n_helper(argv[2], argv[3], wcstoul(argv[4], NULL, 10));
+    if (argc >= 4 && wcscmp(argv[1], L"--n2n-test") == 0) return n2n_test(argv[2], argv[3]);
     if (argc >= 3 && wcscmp(argv[1], L"--update-test") == 0) {   // --update-test <out.json> [install]: check (+ download and swap), no window
         init_dir(NULL);
         json r = { {"check", check_update()} };
@@ -1012,6 +1274,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
             return capture_button(name, timeout);
         });
         w.bind("cancelCapture", [](const std::string &) { g_capture_cancel = true; return std::string("{}"); });
+        async("padState", [](json a) { return pad_state(a.is_array() && !a.empty() && a[0].is_string() ? a[0].get<std::string>() : ""); });
+        async("padRelease", [](json) { std::lock_guard<std::mutex> lk(g_pad_mtx); pad_close(); g_pad_retry = 0; return json({ {"ok", true} }); });
         async("checkUpdate", [uitest](json) { return uitest ? json({ {"ok", true}, {"available", false}, {"disabled", true} }) : check_update(); });
         async("installUpdate", [&w](json) {
             if (game_running()) return json({ {"ok", false}, {"error", "Close the game before updating the launcher"} });

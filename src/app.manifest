@@ -3,8 +3,9 @@
   <assemblyIdentity type="win32" name="EXVS.Launcher" version="1.0.0.0"/>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security><requestedPrivileges>
-      <!-- the game, N2N (TAP adapter) and closing the elevated game all need administrator rights, like SnowLauncher -->
-      <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+      <!-- runs as the user; only N2N (TAP adapter) needs administrator rights, so it runs in an elevated helper
+           (this exe in its n2n-helper mode, started with the "runas" verb when you connect) -->
+      <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
     </requestedPrivileges></security>
   </trustInfo>
   <application xmlns="urn:schemas-microsoft-com:asm.v3">

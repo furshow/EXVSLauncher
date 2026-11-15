@@ -42,6 +42,31 @@ h1 { font: 600 26px var(--head); margin: 0 0 4px; letter-spacing: 0.4px; }
 h2 { font: 600 13px var(--head); text-transform: uppercase; letter-spacing: 1.6px; color: var(--accent-hi); margin: 0 0 14px; }
 
 /* ---------- generic controls ---------- */
+.otab[hidden] { display: none !important; }
+.vpn-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.vpn-steps .st { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--line);
+  background: linear-gradient(135deg, rgba(47,140,255,0.10), rgba(16,20,32,0.6) 60%); }
+.vpn-steps b { flex: 0 0 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 13px var(--head); color: #fff;
+  background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+.vpn-steps strong { display: block; font: 600 14px var(--head); letter-spacing: .3px; margin-bottom: 2px; }
+.vpn-steps span { color: var(--muted); font-size: 12.5px; }
+.net-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.net-card { position: relative; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 20px 18px; transition: border-color .15s; }
+.net-card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: .7; }
+.net-card:hover { border-color: var(--line-strong); }
+.net-head { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+.net-head .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--accent-hi);
+  background: rgba(47,140,255,0.12); border: 1px solid rgba(47,140,255,0.3); }
+.net-head .ic svg { width: 24px; height: 24px; }
+.net-head .tt { font: 600 18px var(--head); letter-spacing: .4px; }
+.net-card .ds { color: var(--dim); font-size: 12.5px; }
+.net-card .fl { display: block; font: 600 11.5px var(--head); text-transform: uppercase; letter-spacing: 1.4px; color: var(--muted); margin-bottom: 6px; }
+.net-card select, .net-card .ip-box input { width: 100%; min-width: 0; padding: 10px 12px; border-radius: 9px; }
+.ip-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); }
+.ip-box { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .2s ease, opacity .2s ease, margin .2s ease; }
+.ip-box > input { overflow: hidden; }
+.ip-box.open { grid-template-rows: 1fr; opacity: 1; margin-top: 10px; }
+.ip-box:not(.open) > input { padding-top: 0; padding-bottom: 0; border-width: 0; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 8px; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 40px; padding: 4px 0 10px; }
@@ -121,7 +146,8 @@ select option { background: #0b0f19; }
 
 /* ---------- settings: game-menu style ---------- */
 #page-settings { padding: 0; display: none; }
-#page-settings.active { display: flex; flex-direction: column; }
+#page-settings.active { display: flex; flex-direction: column; overflow: hidden; }
+.set-head, .set-foot { flex-shrink: 0; }
 .set-head { padding: 24px 34px 0; background: linear-gradient(180deg, rgba(47,140,255,0.08), transparent); }
 .set-head h1 { font-size: 30px; letter-spacing: 2px; text-transform: uppercase; }
 .cats { display: flex; align-items: flex-end; gap: 4px; margin-top: 14px; border-bottom: 1px solid var(--line); }
@@ -130,7 +156,7 @@ select option { background: #0b0f19; }
 .cats button:hover { color: var(--text); }
 .cats button.on { color: #fff; }
 .cats button.on::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
-.set-body { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 26px; padding: 18px 34px 0; min-height: 0; }
+.set-body { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: minmax(0, 1fr); gap: 26px; padding: 18px 34px 0; min-height: 0; }
 .opts { overflow-y: auto; padding: 2px 8px 24px 0; }
 .opt-sec { font: 600 12px var(--head); letter-spacing: 2px; text-transform: uppercase; color: var(--dim); margin: 18px 0 8px 4px; }
 .opt-sec:first-child { margin-top: 2px; }
@@ -155,7 +181,7 @@ select option { background: #0b0f19; }
 .opt input[type=text], .opt input[type=password], .opt select { width: 100%; min-width: 0; height: 38px; background: rgba(5,7,12,0.6); border-color: var(--line); }
 .opt .acts { display: flex; gap: 8px; justify-content: flex-end; }
 .opt .acts .btn { flex: 1; }
-.info { align-self: start; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-top: 2px; }
+.info { align-self: start; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-top: 2px; max-height: calc(100% - 18px); overflow-y: auto; }
 .info .k { font: 600 11px var(--head); letter-spacing: 2px; text-transform: uppercase; color: var(--accent-hi); }
 .info h3 { font: 600 20px var(--head); margin: 6px 0 10px; }
 .info p { color: #aab5cc; margin: 0 0 12px; }
@@ -178,6 +204,13 @@ select option { background: #0b0f19; }
 .cap:hover { border-color: var(--accent); }
 .cap.listening { border-color: var(--amber); color: var(--amber); animation: pulse 1s infinite; }
 .cap.empty { color: var(--dim); font-weight: 400; }
+/* input tester (same look as the overlay's arcade input display, drawn on a canvas) */
+.tester { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.tester .th { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.tester canvas { width: 100%; aspect-ratio: 540 / 300; display: block; background: rgba(5,7,12,0.6); border: 1px solid var(--line); border-radius: 10px; }
+.tester.on canvas { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(47,140,255,0.35); }
+.tester .raw { margin: 8px 2px 0; font: 12px Consolas, "Cascadia Mono", monospace; color: var(--dim); min-height: 16px; word-break: break-all; }
+.tester .tip { margin: 6px 2px 0; font-size: 12px; color: var(--dim); }
 @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(255,181,71,0.15); } }
 
 /* ---------- online / mods ---------- */
@@ -293,8 +326,34 @@ body.pad .pad-hint { display: block; }
     <!-- ONLINE -->
     <section class="page" id="page-online">
       <h1>Online</h1>
-      <p class="sub">N2N virtual LAN to play with friends over the internet, and the local card server for offline play.</p>
-      <div class="grid">
+      <p class="sub">Play with friends over a VPN, a LAN or the N2N virtual LAN, and run the local card server for offline play.</p>
+      <div class="cats" id="online-tabs" style="margin:0 0 18px"><button data-ot="lan" class="on">VPN / LAN</button><button data-ot="n2n">N2N</button></div>
+      <div class="otab" data-ot="lan">
+        <div class="vpn-steps">
+          <div class="st"><b>1</b><div><strong>Connect your VPN</strong><span>Radmin VPN, ZeroTier, Hamachi, Tailscale… or just your LAN.</span></div></div>
+          <div class="st"><b>2</b><div><strong>Pick its adapter</strong><span>Choose the VPN's network below for the game and the Live Monitor.</span></div></div>
+          <div class="st"><b>3</b><div><strong>Press Play</strong><span>Everyone in the same VPN can now match with you.</span></div></div>
+        </div>
+        <div class="net-grid">
+          <div class="net-card">
+            <div class="net-head"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6L2 15.5A2.5 2.5 0 0 0 4.5 18c.9 0 1.7-.5 2.1-1.2L8 15h8l1.4 1.8c.4.7 1.2 1.2 2.1 1.2a2.5 2.5 0 0 0 2.5-2.5l-.7-6.9A4 4 0 0 0 17.3 5z"/></svg></div>
+              <div><div class="tt">Game</div><div class="ds">The client you play on.</div></div></div>
+            <label class="fl">Network adapter</label>
+            <select data-k="cfg.client.iface" class="net-sel"></select>
+            <div class="ip-row"><div><div class="fl" style="margin:0">Fixed IP</div><div class="ds">Leave off unless your group told you to.</div></div><label class="switch"><input type="checkbox" data-k="cfg.client.ipRun" data-iprun="client"><span></span></label></div>
+            <div class="ip-box" data-ipbox="client"><input type="text" data-k="cfg.client.ip" data-ip="client" placeholder="192.168.x.x"></div>
+          </div>
+          <div class="net-card">
+            <div class="net-head"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M10 8.5v5l4-2.5z"/></svg></div>
+              <div><div class="tt">Live Monitor</div><div class="ds">The spectator screen of the arcade.</div></div></div>
+            <label class="fl">Network adapter</label>
+            <select data-k="cfg.lm.iface" class="net-sel"></select>
+            <div class="ip-row"><div><div class="fl" style="margin:0">Fixed IP</div><div class="ds">Leave off unless your group told you to.</div></div><label class="switch"><input type="checkbox" data-k="cfg.lm.ipRun" data-iprun="lm"><span></span></label></div>
+            <div class="ip-box" data-ipbox="lm"><input type="text" data-k="cfg.lm.ip" data-ip="lm" placeholder="192.168.x.x"></div>
+          </div>
+        </div>
+      </div>
+      <div class="otab grid" data-ot="n2n" hidden>
         <div class="card">
           <h2>N2N virtual LAN <span class="pill off" id="n2n-pill">Disconnected</span></h2>
           <div class="row"><label>Supernode<span class="hint">host:port given by your group</span></label><div class="ctl"><input type="text" data-k="n2n.host" placeholder="example.com:7654"></div></div>
@@ -448,6 +507,7 @@ async function call(name, ...args) {
     case "getStatus": return mock.status;
     case "checkUpdate": return { ok: true, available: true, current: mock.state.version, version: "1.9.1", size: 2400000,
       notes: "## What's new\n- **Automatic updates** for the launcher and the overlay.\n- Fixes.\n\nThanks for playing!" };
+    case "padState": { const ph = Math.floor(performance.now() / 600) % 8; return { connected: true, buttons: [ph + 1], pov: ph * 45, x: 0, y: 0 }; }
     case "listControllers": return [{ name: "Controller (Xbox One For Windows)", xinput: true }, { name: "Wireless Controller", xinput: false }];
     default: return { ok: true };
   }
@@ -598,13 +658,6 @@ const CATS = {
     { type: "text", label: "Serial", desc: "4 letters or numbers that identify this machine.", get: () => S.cfg.serial, set: v => S.cfg.serial = v.trim().slice(0, 4), maxlength: 4 },
   ]},
   advanced: { title: "Advanced", items: () => [
-    { section: "Network adapter" },
-    cycle({ type: "select", label: "Game adapter", desc: "Network adapter the game uses for local / N2N matches.", values: () => S.ifaces, get: () => Math.max(0, S.ifaces.indexOf(S.cfg.client.iface)), set: v => S.cfg.client.iface = S.ifaces[v] }),
-    toggle({ label: "Game fixed IP", desc: "Force the game to use this IP address. Leave off unless your group told you to.", get: () => S.cfg.client.ipRun, set: v => S.cfg.client.ipRun = v }),
-    { type: "text", label: "Game IP address", visible: () => S.cfg.client.ipRun, desc: "IP address for the game.", get: () => S.cfg.client.ip, set: v => S.cfg.client.ip = v.trim() },
-    cycle({ type: "select", label: "Live Monitor adapter", desc: "Network adapter the Live Monitor uses.", values: () => S.ifaces, get: () => Math.max(0, S.ifaces.indexOf(S.cfg.lm.iface)), set: v => S.cfg.lm.iface = S.ifaces[v] }),
-    toggle({ label: "Live Monitor fixed IP", desc: "Force the Live Monitor to use this IP address.", get: () => S.cfg.lm.ipRun, set: v => S.cfg.lm.ipRun = v }),
-    { type: "text", label: "Live Monitor IP address", visible: () => S.cfg.lm.ipRun, desc: "IP address for the Live Monitor.", get: () => S.cfg.lm.ip, set: v => S.cfg.lm.ip = v.trim() },
     { section: "Loader" },
     toggle({ label: "Disable socket hook", desc: "Turns off the loader's network redirection. Leave it off unless you know you need it.", get: () => S.cfg.disableSocketHook, set: v => S.cfg.disableSocketHook = v }),
     { type: "text", label: "Boot token", desc: "Only needed by some servers.", get: () => S.cfg.bootToken, set: v => S.cfg.bootToken = v.trim() },
@@ -756,6 +809,7 @@ function renderControlsCat(box) {
   $("#info").innerHTML = ctrlTab.startsWith("kb")
     ? `<div class="k">${t("Controls")}</div><h3>${t("Keyboard")}</h3><p>${t("Click a key box and press the new key. Esc cancels, right-click clears.")}</p><p>${t("A+B, B+C, A+C and A+B+C are single keys that press several buttons at once.")}</p><p class="muted">${t("Close game (Kill) shuts the game down right away.")}</p>`
     : `<div class="k">${t("Controls")}</div><h3>${t("Controller")}</h3><p>${t("Pick your controller, turn it on, then click an action and press the button on the controller. An action can have several buttons; pressing one that is already there removes it.")}</p><p class="muted">${t("Xbox controllers use the game's own layout by default. To choose your own buttons, set Button layout to Custom. Card and Coin can also go on a controller button with the EXVS Overlay (Graphics › In-game overlay).")}</p>`;
+  renderTester();
 }
 function renderKeyboard() {
   const side = ctrlTab === "kb-lm" ? "lm" : "client";
@@ -831,6 +885,182 @@ async function capturePad(cap) {
   renderPad();
 }
 window.addEventListener("keydown", e => { if (listening && ctrlTab.startsWith("pad") && e.code === "Escape") { listening = null; call("cancelCapture"); renderPad(); } });
+
+// ---------------------------------------------------------------- input tester
+// Lights up the game actions from the mapping on screen: keyboard keys (while Test is on, every key goes to the
+// tester instead of the menu) or the selected controller, read natively through DirectInput (padState).
+let testing = false, testKeys = new Set(), testPad = null, testTimer = 0, testExitAt = 0;
+const XBOX_DI = { 1: "A", 2: "B", 3: "X", 4: "Y", 5: "LB", 6: "RB", 7: "Back", 8: "Start", 9: "LS", 10: "RS" };
+function renderTester() {
+  if (testing) stopTest();   // tab changed: start again
+  const isPad = ctrlTab.startsWith("pad");
+  const box = document.createElement("div");
+  box.className = "tester" + (testing ? " on" : ""); box.id = "tester";
+  const small = isPad ? [["Start", "Start"], ["Coin", "Coin"], ["Card", "Card"], ["Test", "Test"], ["Service", "Service"]] : [["Start", "Start"], ["Coin", "Coin"], ["Card", "Card"], ["Test", "Test"], ["Kill", "Close"]];
+  box.innerHTML = `
+    <div class="th"><div class="k">${t("Input tester")}</div><button class="btn" id="test-btn" style="padding:5px 14px">${t(testing ? "Stop" : "Start test")}</button></div>
+    <canvas id="t-canvas"></canvas>
+    <div class="raw" id="t-raw"></div>
+    <div class="tip">${t(isPad ? "Press Start test, then press buttons on the controller. Esc or Back + Start (held) stops." : "Press Start test, then press your keys: they go to the tester, not the menu. Esc stops.")}</div>`;
+  $("#info").appendChild(box);
+  $("#test-btn").onclick = () => testing ? stopTest() : startTest();
+  arc.small = small.map(([k, l]) => [k, t(l)]);
+  drawTester();
+}
+function startTest() {
+  if (listening) { if (ctrlTab.startsWith("pad")) call("cancelCapture"); listening = null; renderControlsCat($("#opts")); }
+  testing = true; testKeys.clear(); testPad = null; testExitAt = 0;
+  $("#tester").classList.add("on"); $("#test-btn").textContent = t("Stop");
+  if (ctrlTab.startsWith("pad")) pollTester();
+}
+function stopTest() {
+  testing = false; testKeys.clear(); testPad = null; clearTimeout(testTimer);
+  call("padRelease");
+  const b = $("#test-btn"); if (b) { b.textContent = t("Start test"); $("#tester").classList.remove("on"); drawTester(); }
+}
+async function pollTester() {
+  if (!testing || !$("#tester") || !ctrlTab.startsWith("pad")) { if (testing) stopTest(); return; }
+  const p = S.controller[padIdx] || {};
+  testPad = await call("padState", p.Name || "") || null;
+  if (!testing) return;
+  // gamepads can't press Esc: holding Back + Start for a second stops the test
+  const gp = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  if (gp.some(g => g.buttons[8]?.pressed && g.buttons[9]?.pressed)) { if (!testExitAt) testExitAt = performance.now() + 1000; else if (performance.now() > testExitAt) { stopTest(); return; } }
+  else testExitAt = 0;
+  drawTester();
+  testTimer = setTimeout(pollTester, 33);
+}
+function testerState() {
+  const acts = new Set(); let dx = 0, dy = 0, raw = "";
+  if (!testing) return { acts, dx, dy, raw };
+  if (!ctrlTab.startsWith("pad")) {
+    const kb = S.keyboard[ctrlTab === "kb-lm" ? "lm" : "client"] || {};
+    for (const [k] of KB_ACTIONS) if (kb[k] && testKeys.has(kb[k])) acts.add(k);
+    dx = (acts.has("Right") ? 1 : 0) - (acts.has("Left") ? 1 : 0); dy = (acts.has("Down") ? 1 : 0) - (acts.has("Up") ? 1 : 0);
+    raw = testKeys.size ? t("Keys: {list}", { list: [...testKeys].map(prettyKey).join("  ") }) : "";
+  } else {
+    const p = S.controller[padIdx] || {}, r = testPad;
+    if (!r) return { acts, dx, dy, raw };
+    if (!r.connected) return { acts, dx, dy, raw: t("Controller not connected") };
+    const held = new Set(r.buttons.map(String));
+    const isX = /xbox|x-box|xinput/i.test(p.Name || ""), native = isX ? p.Layout !== "custom" : p.Layout === "native";
+    if (!native) for (const [k, , boolKey] of PAD_ACTIONS) {
+      if (boolKey && String(p[boolKey]).toLowerCase() !== "true") continue;
+      if ((p[k] || "").split(",").some(b => held.has(b.trim()))) acts.add(k);
+    }
+    if (r.pov >= 0) { const a = r.pov * Math.PI / 180; dx = Math.round(Math.sin(a)); dy = -Math.round(Math.cos(a)); }
+    else { dx = r.x > 500 ? 1 : r.x < -500 ? -1 : 0; dy = r.y > 500 ? 1 : r.y < -500 ? -1 : 0; }
+    raw = r.buttons.length ? t("Buttons: {list}", { list: r.buttons.map(b => isX && XBOX_DI[b] ? XBOX_DI[b] : "B" + b).join("  ") }) : "";
+    if (native && isX) raw = (raw ? raw + " · " : "") + t("game's Xbox layout");
+  }
+  // combo keys press several buttons at once
+  if (acts.has("ButtonAB") || acts.has("ButtonABC")) acts.add("ButtonA").add("ButtonB");
+  if (acts.has("ButtonBC") || acts.has("ButtonABC")) acts.add("ButtonB").add("ButtonC");
+  if (acts.has("ButtonAC")) acts.add("ButtonA").add("ButtonC");
+  return { acts, dx, dy, raw };
+}
+function drawTester() {
+  const box = $("#tester"); if (!box) return;
+  box.querySelector("#t-raw").textContent = testerState().raw;
+  if (!arc.raf) { arc.last = 0; arc.raf = requestAnimationFrame(arcFrame); }
+}
+// The EXVS Overlay's arcade input display (EXVSOverlay/src/menu.cpp draw_arcade_overlay), on a 540 x 300 sheet:
+// rounded octagon gate with 8 marks, a ball that slides to the direction leaving a light trail, 8 Vewlix buttons
+// in their colours (game buttons on top, combos below) and the cabinet buttons in a row at the bottom.
+const ARC_W = 540, ARC_H = 300;
+const ARC_BTNS = [
+  ["ButtonA", 270, 108, "A", [1.00, 0.42, 0.66]], ["ButtonB", 342, 92, "B", [0.33, 0.62, 1.00]],
+  ["ButtonC", 414, 92, "C", [0.30, 0.86, 0.46]], ["ButtonD", 486, 100, "D", [1.00, 0.36, 0.32]],
+  ["ButtonAB", 270, 186, "A+B", [1.00, 0.62, 0.20]], ["ButtonBC", 342, 170, "B+C", [0.72, 0.48, 1.00]],
+  ["ButtonAC", 414, 170, "A+C", [0.25, 0.84, 0.90]], ["ButtonABC", 486, 178, "ABC", [0.85, 0.85, 0.88]] ];
+const arc = { bx: 0, by: 0, trail: [], last: 0, raf: 0, moveT: 0, small: [] };
+const rgba = (c, a, m = 1, add = 0) => `rgba(${c.map(v => Math.round(Math.min(1, v * m + add) * 255)).join(",")},${a})`;
+function arcFrame(ms) {
+  arc.raf = 0;
+  const cv = $("#t-canvas"); if (!cv || !cv.clientWidth) return;
+  const now = ms / 1000, dt = arc.last ? Math.min(0.1, now - arc.last) : 0; arc.last = now;
+  const { acts, dx, dy } = testerState();
+  const dpr = window.devicePixelRatio || 1, k = cv.clientWidth / ARC_W;
+  const pw = Math.round(cv.clientWidth * dpr), ph = Math.round(ARC_H * k * dpr);
+  if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+  const g = cv.getContext("2d");
+  g.setTransform(pw / ARC_W, 0, 0, ph / ARC_H, 0, 0); g.clearRect(0, 0, ARC_W, ARC_H);
+  const font = getComputedStyle(document.documentElement).getPropertyValue("--head");
+  const label = (x, y, txt, px, col) => { g.font = `600 ${px}px ${font}`; g.fillStyle = col; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, x, y + px * 0.05); };
+  const circle = (x, y, r, fill) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = fill; g.fill(); };
+  // gate: long sides bulging out through a quadratic curve, short cut corners
+  const CX = 125, CY = 135, S = 72, BULGE = 84, CUT = 24, RO = (S + BULGE) / 2, RD = S - CUT / 2;
+  const gateC = "rgba(204,209,224,0.55)";
+  const cxs = [1, 1, -1, -1], cys = [-1, 1, 1, -1];
+  const pt = (i, x, y) => i % 2 === 0 ? [CX + x * (S - CUT), CY + y * S] : [CX + x * S, CY + y * (S - CUT)];
+  g.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const a1 = i % 2 === 0 ? [CX + cxs[i] * S, CY + cys[i] * (S - CUT)] : [CX + cxs[i] * (S - CUT), CY + cys[i] * S];
+    if (i === 0) g.moveTo(...a1); else g.lineTo(...a1);
+    const n = (i + 1) % 4, b0 = pt(n, cxs[n], cys[n]);
+    const ctl = i % 2 === 0 ? [CX + cxs[i] * BULGE, CY] : [CX, CY + cys[i] * BULGE];
+    g.quadraticCurveTo(...ctl, ...b0);
+  }
+  g.closePath(); g.fillStyle = "rgba(0,0,0,0.25)"; g.fill(); g.strokeStyle = gateC; g.lineWidth = 2.5; g.stroke();
+  const moved = !!(dx || dy), rr = dx && dy ? RD : RO, tx = Math.sign(dx) * rr, ty = Math.sign(dy) * rr;
+  for (let i = 0; i < 9; i++) {
+    const ix = i % 3 - 1, iy = Math.floor(i / 3) - 1, r = ix && iy ? RD : RO;
+    const on = moved && ix === Math.sign(dx) && iy === Math.sign(dy);
+    circle(CX + ix * r, CY + iy * r, on ? 6.5 : i === 4 ? 3 : 4.5, gateC);
+  }
+  // ball slides quickly to the target (frame-rate independent), trail newest -> oldest, thinner and fainter with age
+  const f = 1 - Math.exp(-dt * 38);
+  arc.bx += (tx - arc.bx) * f; arc.by += (ty - arc.by) * f;
+  if (Math.abs(tx - arc.bx) < 0.3) arc.bx = tx;
+  if (Math.abs(ty - arc.by) < 0.3) arc.by = ty;
+  const tl = arc.trail; tl.push({ x: arc.bx, y: arc.by, t: now }); if (tl.length > 96) tl.shift();
+  if (tl.length > 1 && (tl[tl.length - 1].x !== tl[tl.length - 2].x || tl[tl.length - 1].y !== tl[tl.length - 2].y)) arc.moveT = now;
+  const LIFE = 0.28;
+  for (let pass = 0; pass < 2; pass++) {
+    g.lineCap = pass ? "round" : "butt";
+    for (let i = tl.length - 1; i > 0; i--) {
+      const p0 = tl[i], p1 = tl[i - 1], age = now - p1.t;
+      if (age > LIFE) break;
+      if (p0.x === p1.x && p0.y === p1.y) continue;
+      const life = 1 - age / LIFE;
+      g.strokeStyle = rgba([1, 0.18 + 0.25 * (1 - life), 0.32 + 0.35 * (1 - life)], life * (pass ? 0.95 : 0.25));
+      g.lineWidth = pass ? 4 + 9 * life : 10 + 16 * life;
+      g.beginPath(); g.moveTo(CX + p0.x, CY + p0.y); g.lineTo(CX + p1.x, CY + p1.y); g.stroke();
+    }
+  }
+  const bx = CX + arc.bx, by = CY + arc.by;
+  circle(bx, by, 30, `rgba(255,51,64,${moved ? 0.30 : 0.15})`);
+  circle(bx, by, 22, "rgb(219,26,31)");
+  circle(bx - 3, by - 3, 17, "rgb(255,77,66)");
+  circle(bx - 8, by - 9, 6.5, "rgba(255,255,255,0.55)");
+  // buttons: dim at rest, lit with a glow when pressed
+  for (const [key, x, y, txt, c] of ARC_BTNS) {
+    const on = acts.has(key);
+    if (on) circle(x, y, 36, rgba(c, 0.28));
+    circle(x, y, 27, on ? rgba(c, 1) : rgba(c, 0.9, 0.22));
+    g.beginPath(); g.arc(x, y, 27, 0, Math.PI * 2); g.strokeStyle = rgba(c, on ? 1 : 0.55); g.lineWidth = 2.5; g.stroke();
+    label(x, y, txt, txt.length > 1 ? 16 : 22, on ? "rgb(20,20,26)" : rgba(c, 1, 0.5, 0.5));
+  }
+  // cabinet buttons
+  const n = arc.small.length, W = 84, GAP = 12, x0 = (ARC_W - (n * W + (n - 1) * GAP)) / 2;
+  arc.small.forEach(([key, txt], i) => {
+    const on = acts.has(key), x = x0 + i * (W + GAP);
+    g.beginPath(); g.roundRect(x, 257, W, 26, 12); g.fillStyle = on ? "rgb(143,212,240)" : "rgb(120,120,125)"; g.fill();
+    label(x + W / 2, 270, txt, 14, on ? "rgb(20,20,26)" : "#fff");
+  });
+  if (testing || arc.bx || arc.by || now - arc.moveT < LIFE + 0.05) arc.raf = requestAnimationFrame(arcFrame);
+}
+// while testing the keyboard, keys go to the tester only (registered before the menu's own key handlers)
+window.addEventListener("keydown", e => {
+  if (!testing || listening) return;
+  if (!$("#tester")) { stopTest(); return; }
+  if (e.code === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); stopTest(); return; }
+  if (ctrlTab.startsWith("pad")) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  testKeys.add(keyName(e) || e.code); drawTester();
+}, true);
+window.addEventListener("keyup", e => { if (!testing || ctrlTab.startsWith("pad")) return; e.preventDefault(); testKeys.delete(keyName(e) || e.code); drawTester(); }, true);
+window.addEventListener("blur", () => { if (testKeys.size) { testKeys.clear(); drawTester(); } });
 
 // ================================================================ play page
 // credits
@@ -1119,8 +1349,8 @@ function padLoop() {
     if (x < -0.55) pressed.add("left"); if (x > 0.55) pressed.add("right");
   }
   // while a controller button is being captured for mapping, ignore the pad until everything is released
-  if (listening && ctrlTab.startsWith("pad")) padWaitRelease = true;
-  if (padWaitRelease) { if (pressed.size === 0 && !listening) padWaitRelease = false; padPrev = [...pressed]; requestAnimationFrame(padLoop); return; }
+  if ((listening && ctrlTab.startsWith("pad")) || testing) padWaitRelease = true;   // the input tester owns the pad too
+  if (padWaitRelease) { if (pressed.size === 0 && !listening && !testing) padWaitRelease = false; padPrev = [...pressed]; requestAnimationFrame(padLoop); return; }
 
   for (const b of pressed) if (!padPrev.includes(b)) {
     onPad(b);
@@ -1140,7 +1370,16 @@ requestAnimationFrame(padLoop);
   setLang(S.app.lang || systemLang());
   S.ifaces = [...new Set([...(S.interfaces || []), S.cfg.client.iface, S.cfg.lm.iface].filter(Boolean))];
   for (const s of $$(".iface-sel")) s.innerHTML = [...new Set([...S.ifaces, S.n2n.iface].filter(Boolean))].map(n => `<option>${esc(n)}</option>`).join("");
+  for (const s of $$(".net-sel")) s.innerHTML = S.ifaces.map(n => `<option>${esc(n)}</option>`).join("");
   bindForm();
+  for (const b of $$("#online-tabs button")) b.onclick = () => {
+    $$("#online-tabs button").forEach(x => x.classList.toggle("on", x === b));
+    $$(".otab").forEach(p => p.hidden = p.dataset.ot !== b.dataset.ot);
+  };
+  for (const sw of $$("[data-iprun]")) {   // the fixed-IP box is only editable while its switch is on
+    const box = $(`[data-ipbox="${sw.dataset.iprun}"]`), sync = () => box.classList.toggle("open", sw.checked);
+    sync(); sw.addEventListener("change", sync);
+  }
   const st = $("#n2n-static"); st.checked = !S.n2n.dhcp; st.onchange = () => { S.n2n.dhcp = !st.checked; changed(); };
   renderCats(); renderOpts(); renderQuick(); renderOverlayBanner();
   setBackground(S.background);

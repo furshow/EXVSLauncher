@@ -23,10 +23,16 @@ the first 90 s, unless the overlay is installed (the overlay keeps the window it
 N2N command line (taken from SnowLauncher's strings): `edge -l host:port -c community [-S1] [--no-port-forwarding] [-a ip] [-E] -d <TAP> -I <name> [extra]`.
 After it connects, the TAP adapter's IPv4 metric is set to 1.
 
+The launcher and the game run without administrator rights. Only N2N needs them, so Connect starts a helper (the same
+exe with `--n2n-helper`, through the Windows UAC prompt) that runs `edge.exe` and sends its log back through a named
+pipe. Disconnect signals the helper through a named event. If you close the launcher during a match, the helper keeps
+N2N up and stops it when the game closes.
+
 ## Install
 1. Download `EXVS Launcher.exe` from the releases (or build it, see below).
 2. Put it in the game folder, next to `vsac29_Release.exe` (the folder where SnowLauncher lives).
-3. Run it. It asks for administrator rights, like SnowLauncher, and reads your existing `SnowLauncher.ini`.
+3. Run it. It reads your existing `SnowLauncher.ini`. It doesn't need administrator rights; Windows asks for them
+   only when you connect to N2N. The game folder must be writable by your user (not under `Program Files`).
 
 To go back to SnowLauncher, just run SnowLauncher again: the settings are shared.
 The in-game overlay is installed or removed from **Settings > In-game overlay**.
@@ -55,8 +61,8 @@ The result is `build/EXVS Launcher.exe`.
 - Host: `src/main.cpp`, using webview 0.12 (MIT) and WebView2 SDK headers. JSON by nlohmann/json (MIT).
 - `--selftest <dir> <out.json>` exercises the ini logic on a copy of a game folder.
 - `--uitest <dir> <out.json>` loads the real UI in a hidden window and reports.
-
-Both test modes are meant for a build without the manifest (the release exe asks for administrator rights, like SnowLauncher).
+- `--n2n-test <dir> <out.json>` connects and disconnects N2N through the helper without the UAC prompt (the helper
+  runs unelevated, so use a folder with a stand-in `edge.exe` that prints edge's connect lines).
 
 ## Updates
 The launcher updates itself from the releases of this repo (src/update.h). When it opens it asks the GitHub API for the

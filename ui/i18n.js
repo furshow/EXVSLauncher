@@ -186,6 +186,22 @@
 
     // advanced
     ["Network adapter", "Adaptador de red", "网络适配器", "ネットワークアダプター"],
+    ["Which network the game and the Live Monitor use when you play over a VPN (Radmin, ZeroTier, Hamachi…) or a LAN. Pick the VPN's adapter here.",
+     "Qué red usan el juego y el Live Monitor cuando juegas por una VPN (Radmin, ZeroTier, Hamachi…) o en LAN. Elige aquí el adaptador de la VPN.",
+     "游戏和直播监视器在通过 VPN（Radmin、ZeroTier、Hamachi…）或局域网对战时使用的网络。在这里选择 VPN 的网卡。",
+     "VPN（Radmin、ZeroTier、Hamachi など）や LAN で遊ぶときにゲームとライブモニターが使うネットワーク。ここで VPN のアダプターを選びます。"],
+    ["Play with friends over a VPN, a LAN or the N2N virtual LAN, and run the local card server for offline play.", "Juega con amigos por VPN, en LAN o con la LAN virtual N2N, y usa el servidor de tarjetas local para jugar sin conexión.", "通过 VPN、局域网或 N2N 虚拟局域网与好友对战，并可运行本地卡片服务器离线游玩。", "VPN・LAN・N2N 仮想LAN で友達と対戦。オフライン用のローカルカードサーバーもここから。"],
+    ["Connect your VPN", "Conecta tu VPN", "连接你的 VPN", "VPN に接続"],
+    ["Radmin VPN, ZeroTier, Hamachi, Tailscale… or just your LAN.", "Radmin VPN, ZeroTier, Hamachi, Tailscale… o simplemente tu LAN.", "Radmin VPN、ZeroTier、Hamachi、Tailscale……或者直接用局域网。", "Radmin VPN、ZeroTier、Hamachi、Tailscale…または普通の LAN。"],
+    ["Pick its adapter", "Elige su adaptador", "选择它的网卡", "アダプターを選ぶ"],
+    ["Choose the VPN's network below for the game and the Live Monitor.", "Abajo, elige la red de la VPN para el juego y el Live Monitor.", "在下方为游戏和直播监视器选择 VPN 的网络。", "下でゲームとライブモニターに VPN のネットワークを選びます。"],
+    ["Press Play", "Pulsa Jugar", "点击开始", "プレイを押す"],
+    ["Everyone in the same VPN can now match with you.", "Todos los que estén en la misma VPN ya pueden jugar contigo.", "同一 VPN 中的所有人都可以和你对战了。", "同じ VPN の人と対戦できます。"],
+    ["The client you play on.", "El cliente con el que juegas.", "你用来游玩的客户端。", "プレイするクライアント。"],
+    ["The spectator screen of the arcade.", "La pantalla de espectador del arcade.", "街机的观战画面。", "アーケードの観戦画面。"],
+    ["Fixed IP", "IP fija", "固定 IP", "固定IP"],
+    ["VPN / LAN", "VPN / LAN", "VPN / 局域网", "VPN／LAN"],
+    ["Leave off unless your group told you to.", "Déjalo apagado a menos que tu grupo te lo pida.", "除非你的群组要求，否则请保持关闭。", "グループに指示されない限りオフのままにしてください。"],
     ["Game adapter", "Adaptador del juego", "游戏网卡", "ゲームのアダプター"],
     ["Network adapter the game uses for local / N2N matches.", "Adaptador de red que usa el juego para partidas locales / N2N.", "游戏用于局域网 / N2N 对战的网络适配器。", "ゲームがローカル／N2N 対戦に使うネットワークアダプター。"],
     ["Game fixed IP", "IP fija del juego", "游戏固定 IP", "ゲームの固定IP"],
@@ -373,6 +389,15 @@
     ["Check for updates first", "Primero busca actualizaciones", "请先检查更新", "先にアップデートを確認してください"],
     ["The update is already downloading", "La actualización ya se está descargando", "更新已在下载中", "アップデートはすでにダウンロード中です"],
     ["Updated. Start EXVS Launcher again to use the new version.", "Actualizado. Abre EXVS Launcher de nuevo para usar la nueva versión.", "已更新。请重新启动 EXVS Launcher 以使用新版本。", "更新しました。新しいバージョンを使うには EXVS Launcher を再度起動してください。"],
+    // input tester
+    ["Input tester", "Probador de controles", "按键测试", "入力テスト"],
+    ["Start test", "Probar", "开始测试", "テスト開始"],
+    ["Keys: {list}", "Teclas: {list}", "按键：{list}", "キー: {list}"],
+    ["Buttons: {list}", "Botones: {list}", "按钮：{list}", "ボタン: {list}"],
+    ["Controller not connected", "Control no conectado", "控制器未连接", "コントローラー未接続"],
+    ["game's Xbox layout", "distribución Xbox del juego", "游戏的 Xbox 布局", "ゲームの Xbox 配置"],
+    ["Press Start test, then press buttons on the controller. Esc or Back + Start (held) stops.", "Pulsa Probar y luego los botones del control. Esc o mantener Back + Start lo detiene.", "点击测试，然后按控制器上的按钮。按 Esc 或按住 Back + Start 停止。", "テストを押してからコントローラーのボタンを押してください。Esc または Back + Start 長押しで停止。"],
+    ["Press Start test, then press your keys: they go to the tester, not the menu. Esc stops.", "Pulsa Probar y luego tus teclas: van al probador, no al menú. Esc lo detiene.", "点击测试，然后按键：按键只会发送到测试器，不会操作菜单。按 Esc 停止。", "テストを押してからキーを押してください。キーはメニューではなくテストに送られます。Esc で停止。"],
   ];
   const I = { es: {}, zh: {}, ja: {} };
   for (const [en, es, zh, ja] of ROWS) { I.es[en] = es; I.zh[en] = zh; I.ja[en] = ja; }
