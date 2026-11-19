@@ -3,7 +3,7 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
-## [Unreleased]
+## [1.2.0] - 2026-11-19
 ### Splitscreen
 - New **Split** page: 2, 3 or 4 players on one PC. Each player gets a copy of the game and picks the **screen** it
   opens on. Players on the same screen share it (side by side for 2, 2×2 for 3-4); a player alone on a screen gets
