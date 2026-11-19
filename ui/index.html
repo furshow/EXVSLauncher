@@ -360,7 +360,7 @@ body.pad .pad-hint { display: block; }
           <div class="sp-opts">
             <div class="wide"><label class="fl">Network adapter</label><select id="sp-iface"></select></div>
             <div class="wide"><label class="fl">Resolution (each copy)</label><select id="sp-res"></select></div>
-            <div class="wide ip-row" style="margin-top:2px"><div><div class="fl" style="margin:0">Start the Live Monitor</div><div class="ds">Needed to play against each other. Turn it off if your group's Live Monitor runs on another PC.</div></div><label class="switch"><input type="checkbox" id="sp-lm"><span></span></label></div>
+            <div class="wide ip-row" style="margin-top:2px"><div><div class="fl" style="margin:0">Start the Live Monitor</div><div class="ds">Needed to play against each other. Turn it off if your group's Live Monitor runs on another PC. It closes when the splitscreen ends.</div></div><label class="switch"><input type="checkbox" id="sp-lm"><span></span></label></div>
             <div class="wide ip-row" style="margin-top:0"><div><div class="fl" style="margin:0">Free play</div><div class="ds">No coins needed on any copy. The debug menu options turned on in your client also apply to every player.</div></div><label class="switch"><input type="checkbox" id="sp-free"><span></span></label></div>
           </div>
           <p class="sp-note">Every copy is a cabinet of its own and needs its own address on this network (your Ethernet or Wi-Fi). They are added while splitscreen runs (Windows asks for permission) and removed when the last copy closes.</p>
@@ -558,7 +558,7 @@ function setLang(code) {
 const HAS_HOST = typeof window.getState === "function";
 const mock = {
   state: {
-    version: "1.2.0", gameDir: "C:\\Games\\EXVSIB", monitor: { w: 1920, h: 1080 },
+    version: "1.2.1", gameDir: "C:\\Games\\EXVSIB", monitor: { w: 1920, h: 1080 },
     files: { client: true, lm: true, edge: true, server: true, modManager: true, overlay: true, overlayStatus: "outdated", overlayVersion: "0.10.0" },
     cfg: { chipId: "Player1", accessCode: "0000", serial: "XXXX", server: "", region: 40, openingSkip: 3, bootToken: "",
       disableSocketHook: false, enableQuickSkinChange: true, framerateLimit: true, useRealCardReader: false, cardReaderComPort: "",
@@ -586,7 +586,7 @@ async function call(name, ...args) {
     case "checkUpdate": return { ok: true, available: true, current: mock.state.version, version: "1.9.1", size: 2400000,
       notes: "## What's new\n- **Automatic updates** for the launcher and the overlay.\n- Fixes.\n\nThanks for playing!" };
     case "padState": { const ph = Math.floor(performance.now() / 600) % 8; return { connected: true, buttons: [ph + 1], pov: ph * 45, x: 0, y: 0 }; }
-    case "splitPads": { const ph = Math.floor(performance.now() / 900) % 4; return { xinput: [0, 1, 2, 3].map(i => ({ slot: i, connected: i < 2, pressed: i === ph && i < 2 })), devices: ["Hori Fighting Stick mini"] }; }
+    case "splitPads": { const ph = Math.floor(performance.now() / 900) % 4; return { xinput: [0, 1, 2, 3].map(i => ({ slot: i, connected: i < 2, pressed: i === ph && i < 2 })), devices: [{ id: "hid:mock-dualsense-1", name: "DualSense Wireless Controller", label: "DualSense Wireless Controller #1", pressed: ph === 2 }, { id: "hid:mock-dualsense-2", name: "DualSense Wireless Controller", label: "DualSense Wireless Controller #2", pressed: ph === 3 }] }; }
     case "listControllers": return [{ name: "Controller (Xbox One For Windows)", xinput: true }, { name: "Wireless Controller", xinput: false }];
     default: return { ok: true };
   }
@@ -1383,18 +1383,25 @@ function renderSplitPreview() {
   }).join("");
   $("#sp-mon").textContent = notes.join("  ·  ");
 }
+const spDiByName = inp => spPads.devices.filter(d => d.name === inp.slice(3));
+const spPadPressed = inp => inp.startsWith("xinput:") ? !!spPads.xinput[+inp.slice(7)]?.pressed
+  : inp.startsWith("hid:") ? !!spPads.devices.find(d => d.id === inp)?.pressed
+  : inp.startsWith("di:") ? spDiByName(inp).length === 1 && !!spDiByName(inp)[0].pressed : false;
 function spInputOptions(cur) {
   const o = [];
   for (let i = 0; i < 4; i++) { const x = spPads.xinput[i]; o.push([`xinput:${i}`, t("Controller {n} · Xbox / XInput", { n: i + 1 }) + (x && !x.connected ? " — " + t("not connected") : "")]); }
   o.push(["keyboard", t("Keyboard")]);
-  for (const d of spPads.devices) o.push(["di:" + d, d + " · DirectInput"]);
-  if (cur && cur.startsWith("di:") && !o.some(x => x[0] === cur)) o.push([cur, cur.slice(3) + " — " + t("not connected")]);
+  for (const d of spPads.devices) o.push([d.id, d.label + " · DirectInput"]);
+  // 1.2.0 saved DirectInput pads by name ("di:<name>"): kept while exactly one connected pad has that name
+  if (cur && cur.startsWith("di:") && !o.some(x => x[0] === cur)) o.push([cur, cur.slice(3) + (spDiByName(cur).length === 1 ? " · DirectInput" : " — " + t(spDiByName(cur).length ? "choose which one" : "not connected"))]);
+  if (cur && cur.startsWith("hid:") && !o.some(x => x[0] === cur)) o.push([cur, t("DirectInput controller") + " — " + t("not connected")]);
   return o;
 }
 function spInputState(inp) {   // [text, class]
   if (inp === "keyboard") return [t("Plays on the keyboard"), "ok"];
   if (inp.startsWith("xinput:")) { const x = spPads.xinput[+inp.slice(7)]; return x && x.connected ? [t("Connected · press a button to check"), "ok"] : [t("Controller not connected"), "bad"]; }
-  if (inp.startsWith("di:")) return spPads.devices.includes(inp.slice(3)) ? [t("Connected"), "ok"] : [t("Controller not connected"), "bad"];
+  if (inp.startsWith("hid:")) return spPads.devices.some(d => d.id === inp) ? [t("Connected · press a button to check"), "ok"] : [t("Controller not connected"), "bad"];
+  if (inp.startsWith("di:")) { const n = spDiByName(inp).length; return n === 1 ? [t("Connected · press a button to check"), "ok"] : n ? [t("Several controllers have this name: choose which one"), "bad"] : [t("Controller not connected"), "bad"]; }
   return [t("Choose a controller"), "bad"];
 }
 function renderSplit() {
@@ -1468,13 +1475,13 @@ $("#sp-start").onclick = async () => {
 async function spPollPads() {
   try {
     const r = await call("splitPads");
-    const key = x => JSON.stringify([(x.xinput || []).map(p => p.connected), x.devices]);
+    const key = x => JSON.stringify([(x.xinput || []).map(p => p.connected), (x.devices || []).map(d => d.id)]);
     const before = key(spPads);
     if (r && r.xinput) spPads = r;
     if (key(spPads) !== before && !document.activeElement?.closest("#sp-players")) renderSplit();
     else for (let i = 0; i < S.split.players; i++) { const [st, cls] = spInputState(S.split.p[i].input), el = $(`[data-st="${i}"]`); if (el) { el.textContent = st; el.className = "ds " + cls; } }
     for (let i = 0; i < S.split.players; i++) {   // the player whose controller is pressed lights up
-      const inp = S.split.p[i].input, hit = inp.startsWith("xinput:") && spPads.xinput[+inp.slice(7)]?.pressed;
+      const hit = spPadPressed(S.split.p[i].input);
       $(`.sp-card[data-n="${i}"]`)?.classList.toggle("hit", !!hit);
       $(`#sp-preview .tile[data-n="${i}"]`)?.classList.toggle("hit", !!hit);
     }

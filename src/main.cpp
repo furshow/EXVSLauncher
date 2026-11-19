@@ -34,7 +34,7 @@
 #include "overlay_version.h"   // OVERLAY_BUNDLED_VERSION, generated from ../EXVSOverlay/src/menu.h
 
 using json = nlohmann::json;
-static const char *VERSION = "1.2.0";
+static const char *VERSION = "1.2.1";
 
 // ---------------------------------------------------------------------------------------------
 // strings / paths
@@ -607,9 +607,9 @@ static void write_game_files(const json &s) {
         int skip = ji(c, "openingSkip", 3); if (skip < 0 || skip > 3) skip = 3;
         ini.set("config", "OpeningScreenSkip", SKIP_NAMES[skip]);
         ini.set("config", "BootToken", js(c, "bootToken"));
-        ini.set("config", "InterfaceName", js(side, "iface"));
-        if (jb(side, "ipRun", false) && !js(side, "ip").empty()) ini.set("config", "IpAddress", js(side, "ip"));
-        else ini.del("config", "IpAddress");
+        // the loader refuses both keys together: a fixed address replaces the interface
+        if (jb(side, "ipRun", false) && !js(side, "ip").empty()) { ini.set("config", "IpAddress", js(side, "ip")); ini.del("config", "InterfaceName"); }
+        else { ini.set("config", "InterfaceName", js(side, "iface")); ini.del("config", "IpAddress"); }
         if (!lm) {
             ini.set("config", "serial", js(c, "serial"));
             ini.set("config", "Region", std::to_string(ji(c, "region", 40)));
