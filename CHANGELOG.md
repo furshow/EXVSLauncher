@@ -3,6 +3,37 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
+## [Unreleased]
+### Splitscreen
+- New **Split** page: 2, 3 or 4 players on one PC. Each player gets a copy of the game and picks the **screen** it
+  opens on. Players on the same screen share it (side by side for 2, 2×2 for 3-4); a player alone on a screen gets
+  the whole screen. A black backdrop covers each screen in use, and the layout preview shows every screen.
+- Each player picks a controller (Xbox / XInput 1-4, a DirectInput pad or the keyboard) and their own card. The
+  player whose controller is pressed lights up on the page and in the layout preview.
+- Every copy is a cabinet of its own: the launcher writes `Splitscreen\P1`…`P4` with its own `config.ini`,
+  `card.ini`, serial and cabinet number (`29\testmode_pcb.json` networkId 0-3), and starts the game as
+  `vsac29_Release.exe "<player folder>"`.
+- Each copy needs its own address on the network: free addresses next to the chosen adapter's are added for
+  the session only (one Windows permission prompt) and removed when the last copy closes. Addresses left by a
+  session that ended abnormally can be removed with **Clean up**. On a DHCP adapter (Windows turns DHCP off as soon
+  as an address is added by hand) the same address, gateway and DNS are kept during the session, and DHCP is
+  turned back on afterwards.
+- **Free play** (on by default): every copy starts in free play, and the debug menu options turned on in your
+  client apply to every player.
+- Optionally starts the Live Monitor (and the card server, if *Start card server with the game* is on).
+- Needs EXVS Overlay 1.1.0 or newer (included): it gives each copy only its own controller.
+
+### Programs
+- Settings › Launcher › Programs: pick which **Live Monitor** the Play button starts — the game's own
+  `vsac29_Release_LM.exe` or another one you add (for example LiteMonitor) — and switch between them with ◀ ▶.
+- The same for the **card server** program. Auto finds `Server.exe` or `Server-Infinite\Server-Infinite.exe` in the
+  game folder; Add… picks any other `.exe`.
+- New option **Start card server with the game**: Play starts the card server first if it isn't running.
+
+### Startup
+- A loading splash (logo and a progress bar) shows while the launcher starts. The small white window that appeared
+  before the launcher is gone: the main window only shows once the page is drawn.
+
 ## [1.1.0] - 2026-11-14
 ### Permissions
 - The launcher no longer asks for administrator rights when it opens, and the game no longer runs as administrator.

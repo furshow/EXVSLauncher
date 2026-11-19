@@ -16,6 +16,6 @@ $PY tools/make_assets.py .
 $ZIG c++ -target x86_64-windows-gnu -O2 -std=c++17 -municode -Wl,--subsystem,windows \
   -Ithird_party/compat -Ithird_party/webview/core/include -Ithird_party/webview2/include -Ithird_party/json -Ibuild/gen \
   src/main.cpp src/app.rc -o "build/EXVS Launcher.exe" \
-  -ladvapi32 -lole32 -lshell32 -lshlwapi -luser32 -lversion -ldwmapi -lcomdlg32 -liphlpapi -lws2_32 -ldinput8 -ldxguid -lwinhttp -lbcrypt
+  -ladvapi32 -lgdi32 -lole32 -lshell32 -lshlwapi -luser32 -lversion -ldwmapi -lcomdlg32 -liphlpapi -lws2_32 -ldinput8 -ldxguid -lwinhttp -lbcrypt
 rm -f build/*.pdb build/*.lib 2>/dev/null || true
 ls -la build/*.exe

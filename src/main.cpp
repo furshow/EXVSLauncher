@@ -165,6 +165,75 @@ static DWORD run_hidden_wait(const std::wstring &cmdline, DWORD timeout_ms) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Programs the user can pick: the Live Monitor exe (the game's own LM or e.g. LiteMonitor) and the card server
+// exe. EXVSLauncher.ini [Programs] LMExe / ServerExe hold the one in use ("" = the default), LMList / ServerList
+// the ones the user added (paths separated by |). Paths inside the game folder are stored relative to it.
+// ---------------------------------------------------------------------------------------------
+static std::mutex g_prog_mx;
+static std::string g_lm_sel, g_server_sel;   // as stored in the ini
+static std::wstring abs_path(const std::string &p) {
+    if (p.empty()) return L"";
+    std::wstring w = widen(p);
+    for (auto &c : w) if (c == L'/') c = L'\\';
+    bool absolute = (w.size() > 2 && w[1] == L':') || (w.size() > 1 && w[0] == L'\\' && w[1] == L'\\');
+    return absolute ? w : g_dir + w;
+}
+static std::string rel_path(const std::wstring &p) {   // relative to the game folder when inside it
+    if (p.size() > g_dir.size() && _wcsnicmp(p.c_str(), g_dir.c_str(), g_dir.size()) == 0) return narrow(p.substr(g_dir.size()));
+    return narrow(p);
+}
+static std::wstring file_name(const std::wstring &p) { size_t i = p.find_last_of(L"\\/"); return i == std::wstring::npos ? p : p.substr(i + 1); }
+static std::wstring dir_name(const std::wstring &p) { size_t i = p.find_last_of(L"\\/"); return i == std::wstring::npos ? g_dir.substr(0, g_dir.size() - 1) : p.substr(0, i); }
+
+static std::wstring lm_path() {
+    std::lock_guard<std::mutex> l(g_prog_mx);
+    return g_lm_sel.empty() ? path_of(LM_EXE) : abs_path(g_lm_sel);
+}
+static bool lm_is_default() { return _wcsicmp(lm_path().c_str(), path_of(LM_EXE).c_str()) == 0; }
+static std::wstring server_exe() {
+    {
+        std::lock_guard<std::mutex> l(g_prog_mx);
+        if (!g_server_sel.empty()) return abs_path(g_server_sel);
+    }
+    for (const wchar_t *n : { L"Server\\Server.exe", L"Server.exe", L"Server-Infinite\\Server-Infinite.exe" })
+        if (exists(path_of(n))) return path_of(n);
+    return L"";
+}
+// processes started from exactly this exe
+static std::vector<DWORD> procs_at(const std::wstring &full) {
+    std::vector<DWORD> out;
+    if (full.empty()) return out;
+    std::wstring name = file_name(full);
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snap == INVALID_HANDLE_VALUE) return out;
+    PROCESSENTRY32W pe = { sizeof(pe) };
+    for (BOOL ok = Process32FirstW(snap, &pe); ok; ok = Process32NextW(snap, &pe)) {
+        if (_wcsicmp(pe.szExeFile, name.c_str()) != 0) continue;
+        HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
+        wchar_t p[MAX_PATH]; DWORD n = MAX_PATH;
+        bool same = h && QueryFullProcessImageNameW(h, 0, p, &n) && _wcsicmp(p, full.c_str()) == 0;
+        if (h) CloseHandle(h);
+        if (same) out.push_back(pe.th32ProcessID);
+    }
+    CloseHandle(snap);
+    return out;
+}
+static void kill_at(const std::wstring &full) {
+    for (DWORD pid : procs_at(full)) {
+        HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+        if (h) { TerminateProcess(h, 0); CloseHandle(h); }
+    }
+}
+static bool lm_running() { return !procs_at(lm_path()).empty() || !find_procs(LM_EXE, true).empty(); }
+static bool server_running() { return !procs_at(server_exe()).empty(); }
+static std::string start_server() {   // "" = ok (or already running), else an error
+    std::wstring s = server_exe();
+    if (s.empty() || !exists(s)) return "The card server program was not found (Settings › Launcher › Programs)";
+    if (server_running()) return "";
+    return start_process(s, L"", dir_name(s), CREATE_NEW_CONSOLE) ? "" : "Could not start the card server (see EXVSLauncher.log)";
+}
+
+// ---------------------------------------------------------------------------------------------
 // Status shared with the UI
 // ---------------------------------------------------------------------------------------------
 static std::mutex g_mx;
@@ -258,6 +327,8 @@ static const char *overlay_status() {
     return c > 0 ? "newer" : c == 0 ? "current" : "outdated";
 }
 
+static json split_get_state(const json &cfg);   // split.h
+static void split_save_state(const json &sp);
 static json get_state() {
     Ini sl(L"SnowLauncher.ini"), cfg(L"config.ini"), card(L"card.ini"), me(L"EXVSLauncher.ini");
     bool have_sl = exists(sl.path);
@@ -294,6 +365,7 @@ static json get_state() {
                  {"ipRun", sl.getb("Game_Config", "LM_IpAddressRun", false)}, {"ip", sl.get("Game_Config", "LM_IpAddress")} }},
     };
     s["cfg"] = c;
+    s["split"] = split_get_state(c);
 
     json kb = json::object();
     const char *kb_secs[][2] = { {"client", "Game_Client_Keyboard"}, {"lm", "Game_LM_Keyboard"} };
@@ -327,7 +399,29 @@ static json get_state() {
                  {"syncMods", me.getb("Launcher", "SyncMods", false)}, {"closeOnPlay", me.getb("Launcher", "CloseOnPlay", false)},
                  {"streamer", me.getb("Launcher", "StreamerMode", false)},
                  {"lang", me.get("Launcher", "Language")},   // "" = follow the Windows language
-                 {"autoUpdate", me.getb("Launcher", "CheckUpdates", true)}, {"updatesEnabled", updates_enabled()} };
+                 {"autoUpdate", me.getb("Launcher", "CheckUpdates", true)}, {"updatesEnabled", updates_enabled()},
+                 {"autoServer", me.getb("Launcher", "AutoStartServer", false)} };
+    {   // Programs
+        auto split = [](const std::string &s) {
+            json a = json::array(); size_t p = 0;
+            while (p <= s.size()) { size_t q = s.find('|', p); if (q == std::string::npos) q = s.size(); std::string x = trim(s.substr(p, q - p)); if (!x.empty()) a.push_back(x); p = q + 1; }
+            return a;
+        };
+        std::string lm = me.get("Programs", "LMExe"), sv = me.get("Programs", "ServerExe");
+        { std::lock_guard<std::mutex> l(g_prog_mx); g_lm_sel = lm; g_server_sel = sv; }
+        std::wstring auto_sv;
+        for (const wchar_t *n : { L"Server\\Server.exe", L"Server.exe", L"Server-Infinite\\Server-Infinite.exe" })
+            if (exists(path_of(n))) { auto_sv = path_of(n); break; }
+        json found = json::object();
+        for (auto &x : split(me.get("Programs", "LMList")))     found[x.get<std::string>()] = exists(abs_path(x));
+        for (auto &x : split(me.get("Programs", "ServerList"))) found[x.get<std::string>()] = exists(abs_path(x));
+        s["programs"] = { {"lm", lm}, {"lmList", split(me.get("Programs", "LMList"))}, {"lmDefault", narrow(LM_EXE)},
+                          {"server", sv}, {"serverList", split(me.get("Programs", "ServerList"))}, {"serverAuto", rel_path(auto_sv)},
+                          {"found", found} };
+        s["files"]["lm"] = exists(lm_path());
+        s["files"]["server"] = !server_exe().empty() && exists(server_exe());
+        s["files"]["serverPath"] = rel_path(server_exe());
+    }
     s["interfaces"] = list_interfaces();
     {   // main monitor, to recommend a resolution
         MONITORINFO mi = { sizeof(mi) };
@@ -428,6 +522,8 @@ static void save_state(const json &s) {
     sl.set("AppSettings", "N2N_Conf", js(n, "conf"));
     me.set("N2N", "Interface", js(n, "iface"));
 
+    if (s.contains("split") && s["split"].is_object()) split_save_state(s["split"]);
+
     const json &a = s.at("app");
     std::string mode = js(a, "mode", "client");
     sl.set("AppSettings", "StartClient", tf(mode != "lm"));
@@ -437,6 +533,21 @@ static void save_state(const json &s) {
     me.set("Launcher", "StreamerMode", tf(jb(a, "streamer", false)));
     if (!js(a, "lang").empty()) me.set("Launcher", "Language", js(a, "lang"));
     me.set("Launcher", "CheckUpdates", tf(jb(a, "autoUpdate", true)));
+    me.set("Launcher", "AutoStartServer", tf(jb(a, "autoServer", false)));
+    if (s.contains("programs") && s["programs"].is_object()) {
+        const json &p = s["programs"];
+        auto join = [](const json &arr) {
+            std::string o;
+            if (arr.is_array()) for (auto &x : arr) if (x.is_string() && !x.get<std::string>().empty()) { if (!o.empty()) o += "|"; o += x.get<std::string>(); }
+            return o;
+        };
+        std::string lm = js(p, "lm"), sv = js(p, "server");
+        me.set("Programs", "LMExe", lm);
+        me.set("Programs", "ServerExe", sv);
+        me.set("Programs", "LMList", join(p.value("lmList", json::array())));
+        me.set("Programs", "ServerList", join(p.value("serverList", json::array())));
+        std::lock_guard<std::mutex> l(g_prog_mx); g_lm_sel = lm; g_server_sel = sv;
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -482,7 +593,7 @@ static void write_game_files(const json &s) {
     bool lm_side[] = { false, true };
     for (bool lm : lm_side) {
         Ini ini(lm ? L"lmnfig.ini" : L"config.ini");
-        if (lm && !exists(ini.path) && !exists(path_of(LM_EXE))) continue;
+        if (lm && !exists(ini.path) && !exists(lm_path())) continue;
         const json &side = c.at(lm ? "lm" : "client");
         int win = ji(side, "window", lm ? 9 : 0);
         ini.set("config", lm ? "Mode" : "mode", lm ? "LM" : "Client");
@@ -610,15 +721,17 @@ static void watch_window(const wchar_t *exe, int idx) {
 // Play / stop
 // ---------------------------------------------------------------------------------------------
 static std::atomic<bool> g_launching{false};
-static bool game_running() { return !find_procs(CLIENT_EXE, true).empty() || !find_procs(LM_EXE, true).empty(); }
+static bool game_running() { return !find_procs(CLIENT_EXE, true).empty() || lm_running(); }
 
 static json do_play(const std::string &mode, json state) {
     if (g_launching.exchange(true)) return { {"ok", false}, {"error", "Already starting"} };
     struct Done { ~Done() { g_launching = false; set_busy(""); } } done;
     bool want_client = mode != "lm", want_lm = mode != "client";
     if (want_client && !exists(path_of(CLIENT_EXE))) return { {"ok", false}, {"error", "vsac29_Release.exe not found next to the launcher"} };
-    if (want_lm && !exists(path_of(LM_EXE))) return { {"ok", false}, {"error", "vsac29_Release_LM.exe not found next to the launcher"} };
-    if ((want_client && !find_procs(CLIENT_EXE, true).empty()) || (want_lm && !find_procs(LM_EXE, true).empty()))
+    const std::wstring lm_exe = lm_path();
+    const bool lm_default = lm_is_default();
+    if (want_lm && !exists(lm_exe)) return { {"ok", false}, {"error", narrow(file_name(lm_exe)) + " (Live Monitor program) was not found"} };
+    if ((want_client && !find_procs(CLIENT_EXE, true).empty()) || (want_lm && lm_running()))
         return { {"ok", false}, {"error", "The game is already running"} };
     for (wchar_t ch : g_dir) if (ch >= 0x2E80) return { {"ok", false}, {"error", "The game folder path has non-Latin characters; the game can't start from there"} };
 
@@ -632,8 +745,22 @@ static json do_play(const std::string &mode, json state) {
         log_line("mod sync exit code %lu", rc);
     }
 
+    if (jb(state["app"], "autoServer", false) && !server_running()) {
+        set_busy("Starting the card server…");
+        std::string err = start_server();
+        if (!err.empty()) log_line("auto-start card server: %s", err.c_str());
+        else { for (int i = 0; i < 10 && !server_running(); i++) Sleep(200); Sleep(1000); }   // let it listen before the game asks for the card
+    }
+
     set_busy("Starting the game…");
     auto launch = [&](bool lm) {
+        if (lm && !lm_default) {   // another Live Monitor (e.g. LiteMonitor): run it directly; it reads lmnfig.ini from the game folder
+            DWORD_PTR et = SHGetFileInfoW(lm_exe.c_str(), 0, NULL, 0, SHGFI_EXETYPE);
+            bool console = et && HIWORD(et) == 0;
+            bool ok = start_process(lm_exe, L"", g_dir.substr(0, g_dir.size() - 1), console ? CREATE_NEW_CONSOLE : 0);
+            if (ok && !console && !overlay_installed()) watch_window(file_name(lm_exe).c_str(), ji(state["cfg"]["lm"], "window", 9));
+            return ok;
+        }
         const wchar_t *helper = lm ? L"run_iboost_LM_mode_v4.exe" : L"run_iboost_CLIENT_mode_v4.exe";
         bool ok = exists(path_of(helper)) ? start_process(path_of(helper), L"", g_dir.substr(0, g_dir.size() - 1))
                                           : start_process(path_of(lm ? LM_EXE : CLIENT_EXE), L"", g_dir.substr(0, g_dir.size() - 1));
@@ -651,6 +778,7 @@ static json do_play(const std::string &mode, json state) {
 static void stop_game() {
     kill_procs(CLIENT_EXE, true);
     kill_procs(LM_EXE, true);
+    if (!lm_is_default()) kill_at(lm_path());
     kill_procs(L"run_iboost_CLIENT_mode_v4.exe", true);
     kill_procs(L"run_iboost_LM_mode_v4.exe", true);
     log_line("game closed from the launcher");
@@ -871,15 +999,6 @@ static void n2n_stop() {
     kill_procs(L"edge.exe", true);      // fallback for an edge.exe this launcher may close itself
 }
 
-static std::wstring server_exe() {
-    if (exists(path_of(L"Server\\Server.exe"))) return path_of(L"Server\\Server.exe");
-    if (exists(path_of(L"Server.exe"))) return path_of(L"Server.exe");
-    return L"";
-}
-static bool server_running() {
-    std::wstring s = server_exe();
-    return !s.empty() && !find_procs(L"Server.exe", true).empty();
-}
 
 // ---------------------------------------------------------------------------------------------
 // Controllers (DirectInput): list devices and capture a button number for the mapping UI
@@ -1048,6 +1167,8 @@ static json pad_state_di(const std::string &name) {
     return { {"connected", true}, {"buttons", b}, {"pov", pov}, {"x", st.lX}, {"y", st.lY} };
 }
 
+#include "split.h"   // splitscreen (2-4 copies of the game on this PC)
+
 // ---------------------------------------------------------------------------------------------
 // Overlay (embedded EXVS Overlay DLL) and background picture
 // ---------------------------------------------------------------------------------------------
@@ -1075,6 +1196,16 @@ static json remove_overlay() {
     }
     log_line("overlay removed");
     return { {"ok", true} };
+}
+static json pick_exe() {   // {path} relative to the game folder when inside it
+    wchar_t file[MAX_PATH] = L"";
+    OPENFILENAMEW of = { sizeof(of) };
+    std::wstring start = g_dir.substr(0, g_dir.size() - 1);
+    of.hwndOwner = g_hwnd; of.lpstrFile = file; of.nMaxFile = MAX_PATH; of.lpstrInitialDir = start.c_str();
+    of.lpstrFilter = L"Programs (*.exe)\0*.exe\0";
+    of.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+    if (!GetOpenFileNameW(&of)) return { {"cancelled", true} };
+    return { {"path", rel_path(file)} };
 }
 static json pick_background() {
     wchar_t file[MAX_PATH] = L"";
@@ -1143,13 +1274,245 @@ static int n2n_test(const wchar_t *dir, const wchar_t *out) {
     return 0;
 }
 
+// --split-selftest <game dir> <out.json>: the splitscreen steps that need no admin rights and start nothing (player
+// settings check, free address search, players' folders, window tiles), on a copy of a game folder, no window
+static int split_selftest(const wchar_t *dir, const wchar_t *out) {
+    init_dir(dir);
+    json r, st = get_state();
+    r["split"] = st["split"];
+    int count = std::max(2, std::min(4, ji(st["split"], "players", 2)));
+    std::vector<SplitPlayer> pl;
+    r["playersError"] = split_players(st, count, pl);
+    std::vector<std::string> ips;
+    for (int i = 0; i < count; i++) ips.push_back("192.0.2." + std::to_string(10 + i));
+    if (r["playersError"].get<std::string>().empty()) { write_game_files(st); split_write_players(st, pl, ips, 3); }
+    std::string iface = js(st["split"], "iface");
+    if (!iface.empty()) {
+        AdapterInfo ad = adapter_info(iface);
+        r["adapter"] = { {"found", ad.found}, {"ip", ip_str(ad.ip)}, {"prefix", ad.prefix}, {"up", ad.up} };
+        if (ad.found && ad.ip && ad.up) r["freeIps"] = pick_free_ips(ad, count, {});
+    }
+    RECT mon = monitor_rect(0);
+    json tiles = json::array();
+    for (int c = 1; c <= 4; c++) for (int n = 1; n <= c; n++) { RECT t = split_tile(mon, n, c); tiles.push_back({ c, n, t.left, t.top, t.right - t.left, t.bottom - t.top }); }
+    r["tiles"] = tiles;
+    json pr = json::array();   // the players' windows with their monitors from the settings
+    for (const RECT &t : split_rects(pl)) pr.push_back({ t.left, t.top, t.right - t.left, t.bottom - t.top });
+    r["playerRects"] = pr;
+    r["pads"] = split_pads();
+    FILE *f = _wfopen(out, L"wb");
+    if (!f) return 2;
+    std::string t = r.dump(2); fwrite(t.data(), 1, t.size(), f); fclose(f);
+    return 0;
+}
+
 static HANDLE g_mtx;   // single instance
+
+// ---------------------------------------------------------------------------------------------
+// Splash screen. webview shows its window (640x480, white) right away and then waits for WebView2 to start, so the
+// launcher keeps that window hidden (the "webview" window class is subclassed as it is created and its first show is
+// dropped) and shows this splash instead. The page calls uiReady() once it has rendered; then the main window is
+// shown under the splash and the splash goes away.
+// ---------------------------------------------------------------------------------------------
+static HWND g_splash;
+static bool g_hold_main = false;
+static WNDPROC g_wv_proc;
+static HHOOK g_cbt;
+static HICON g_splash_icon;
+static std::wstring g_splash_text = L"Loading…";
+static int g_splash_tick = 0;
+static UINT_PTR g_ready_timer;
+
+static LRESULT CALLBACK hold_proc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+    if (g_hold_main) {
+        if (m == WM_WINDOWPOSCHANGING) ((WINDOWPOS *)lp)->flags &= ~SWP_SHOWWINDOW;
+        if (m == WM_SHOWWINDOW && wp) return 0;
+    }
+    return CallWindowProcW(g_wv_proc, h, m, wp, lp);
+}
+static bool g_splash_test = false;   // --splash-test: the webview window is created off-screen with no taskbar button
+static LRESULT CALLBACK cbt_proc(int code, WPARAM wp, LPARAM lp) {
+    if (code == HCBT_CREATEWND && !g_wv_proc) {
+        wchar_t cls[32] = L"";
+        GetClassNameW((HWND)wp, cls, 32);
+        if (wcscmp(cls, L"webview") == 0) {
+            g_wv_proc = (WNDPROC)SetWindowLongPtrW((HWND)wp, GWLP_WNDPROC, (LONG_PTR)hold_proc);
+            if (g_splash_test) { auto *cs = ((CBT_CREATEWNDW *)lp)->lpcs; cs->x = cs->y = -32000; cs->dwExStyle |= WS_EX_TOOLWINDOW; }
+        }
+    }
+    return CallNextHookEx(g_cbt, code, wp, lp);
+}
+
+static void splash_paint(HWND h, HDC dc) {
+    RECT rc; GetClientRect(h, &rc);
+    int W = rc.right, H = rc.bottom;
+    float s = GetDpiForWindow(h) / 96.0f;
+    auto S = [s](float v) { return (int)(v * s + 0.5f); };
+    HDC m = CreateCompatibleDC(dc);
+    HBITMAP bmp = CreateCompatibleBitmap(dc, W, H);
+    HGDIOBJ ob = SelectObject(m, bmp);
+    // background: navy, a bit lighter at the top (launcher colours)
+    for (int y = 0; y < H; y += 2) {
+        float t = (float)y / H;
+        HBRUSH b = CreateSolidBrush(RGB((int)(16 - 9 * t), (int)(30 - 20 * t), (int)(62 - 45 * t)));
+        RECT r = { 0, y, W, y + 2 }; FillRect(m, &r, b); DeleteObject(b);
+    }
+    {   // thin blue rim
+        HPEN p = CreatePen(PS_SOLID, 1, RGB(38, 74, 140));
+        HGDIOBJ op = SelectObject(m, p), obr = SelectObject(m, GetStockObject(NULL_BRUSH));
+        Rectangle(m, 0, 0, W, H);
+        SelectObject(m, op); SelectObject(m, obr); DeleteObject(p);
+    }
+    int icon = S(84);
+    if (g_splash_icon) DrawIconEx(m, (W - icon) / 2, S(40), g_splash_icon, icon, icon, 0, NULL, DI_NORMAL);
+    SetBkMode(m, TRANSPARENT);
+    auto text = [&](const wchar_t *str, int size, int weight, COLORREF col, int top, int spacing) {
+        HFONT f = CreateFontW(-S((float)size), 0, 0, 0, weight, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Bahnschrift");
+        HGDIOBJ of = SelectObject(m, f);
+        int extra = S((float)spacing);
+        SetTextColor(m, col); SetTextCharacterExtra(m, extra);
+        SIZE sz = {}; int n = (int)wcslen(str);
+        GetTextExtentPoint32W(m, str, n, &sz);
+        TextOutW(m, (W - (sz.cx - extra)) / 2, top, str, n);   // centred without the spacing after the last letter
+        SelectObject(m, of); DeleteObject(f);
+    };
+    text(L"EXVS LAUNCHER", 22, FW_BOLD, RGB(236, 242, 255), S(140), 3);
+    text(g_splash_text.c_str(), 13, FW_NORMAL, RGB(140, 160, 200), S(176), 0);
+    {   // indeterminate progress bar: a blue segment sliding across a dark track
+        int bw = S(220), bh = S(4), bx = (W - bw) / 2, by = S(212);
+        HBRUSH track = CreateSolidBrush(RGB(22, 34, 62));
+        RECT tr = { bx, by, bx + bw, by + bh }; FillRect(m, &tr, track); DeleteObject(track);
+        int seg = bw / 3, period = 90;   // ticks of 16 ms
+        float p = (float)(g_splash_tick % period) / period;
+        int x0 = bx - seg + (int)((bw + seg) * p), x1 = x0 + seg;
+        x0 = std::max(x0, bx); x1 = std::min(x1, bx + bw);
+        if (x1 > x0) {
+            HBRUSH glow = CreateSolidBrush(RGB(47, 140, 255));
+            RECT gr = { x0, by, x1, by + bh }; FillRect(m, &gr, glow); DeleteObject(glow);
+        }
+    }
+    BitBlt(dc, 0, 0, W, H, m, 0, 0, SRCCOPY);
+    SelectObject(m, ob); DeleteObject(bmp); DeleteDC(m);
+}
+static LRESULT CALLBACK splash_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    switch (msg) {
+    case WM_TIMER: g_splash_tick++; InvalidateRect(h, NULL, FALSE); return 0;
+    case WM_ERASEBKGND: return 1;
+    case WM_NCHITTEST: return HTCAPTION;   // can be dragged
+    case WM_PAINT: { PAINTSTRUCT ps; HDC dc = BeginPaint(h, &ps); splash_paint(h, dc); EndPaint(h, &ps); return 0; }
+    }
+    return DefWindowProcW(h, msg, wp, lp);
+}
+static void splash_show() {
+    std::string lang = Ini(L"EXVSLauncher.ini").get("Launcher", "Language");
+    if (lang.empty()) {
+        LANGID id = PRIMARYLANGID(GetUserDefaultUILanguage());
+        lang = id == LANG_SPANISH ? "es" : id == LANG_CHINESE ? "zh" : id == LANG_JAPANESE ? "ja" : "en";
+    }
+    g_splash_text = lang == "es" ? L"Cargando…" : lang == "zh" ? L"正在加载…" : lang == "ja" ? L"読み込み中…" : L"Loading…";
+    HINSTANCE hi = GetModuleHandleW(NULL);
+    g_splash_icon = (HICON)LoadImageW(hi, L"APPICON", IMAGE_ICON, 256, 256, LR_DEFAULTCOLOR);
+    WNDCLASSW wc = {}; wc.lpfnWndProc = splash_proc; wc.hInstance = hi; wc.lpszClassName = L"EXVSLauncherSplash";
+    wc.hCursor = LoadCursorW(NULL, IDC_ARROW); wc.hIcon = LoadIconW(hi, L"APPICON");
+    RegisterClassW(&wc);
+    g_splash = CreateWindowExW(WS_EX_APPWINDOW, wc.lpszClassName, L"EXVS Launcher", WS_POPUP, 0, 0, 10, 10, NULL, NULL, hi, NULL);
+    if (!g_splash) return;
+    float s = GetDpiForWindow(g_splash) / 96.0f;
+    int w = (int)(420 * s), h = (int)(260 * s);
+    RECT wa; SystemParametersInfoW(SPI_GETWORKAREA, 0, &wa, 0);
+    SetWindowPos(g_splash, NULL, wa.left + (wa.right - wa.left - w) / 2, wa.top + (wa.bottom - wa.top - h) / 2, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+    DWORD round = 2 /*DWMWCP_ROUND*/; DwmSetWindowAttribute(g_splash, 33 /*DWMWA_WINDOW_CORNER_PREFERENCE*/, &round, sizeof(round));
+    ShowWindow(g_splash, SW_SHOW);
+    UpdateWindow(g_splash);
+    SetTimer(g_splash, 1, 16, NULL);
+}
+static void main_window_ready() {   // show the main window (once), then drop the splash a moment later
+    if (!g_hold_main) return;
+    g_hold_main = false;
+    if (g_ready_timer) { KillTimer(NULL, g_ready_timer); g_ready_timer = 0; }
+    if (g_splash) {
+        SetWindowPos(g_hwnd, g_splash, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        SetTimer(NULL, 0, 180, [](HWND, UINT, UINT_PTR id, DWORD) {
+            KillTimer(NULL, id);
+            if (g_splash) { DestroyWindow(g_splash); g_splash = NULL; }
+            SetForegroundWindow(g_hwnd); SetFocus(g_hwnd);
+        });
+    } else ShowWindow(g_hwnd, SW_SHOW);
+    if (g_cbt) { UnhookWindowsHookEx(g_cbt); g_cbt = NULL; }
+}
+
+// --splash-test <dir> <out.bmp> <out.json>: draws the splash into a bitmap (never shown) and checks that the webview
+// window stays hidden until main_window_ready() (that window is off-screen, without a taskbar button).
+static int splash_test(const wchar_t *bmp_out, const wchar_t *json_out) {
+    g_splash_test = true;
+    HINSTANCE hi = GetModuleHandleW(NULL);
+    g_splash_icon = (HICON)LoadImageW(hi, L"APPICON", IMAGE_ICON, 256, 256, LR_DEFAULTCOLOR);
+    WNDCLASSW wc = {}; wc.lpfnWndProc = splash_proc; wc.hInstance = hi; wc.lpszClassName = L"EXVSLauncherSplashTest";
+    RegisterClassW(&wc);
+    HWND h = CreateWindowExW(WS_EX_TOOLWINDOW, wc.lpszClassName, L"", WS_POPUP, -32000, -32000, 420, 260, NULL, NULL, hi, NULL);
+    g_splash_tick = 40;
+    HDC sdc = GetDC(NULL), m = CreateCompatibleDC(sdc);
+    BITMAPINFO bi = {}; bi.bmiHeader = { sizeof(BITMAPINFOHEADER), 420, -260, 1, 32, BI_RGB };
+    void *bits = NULL; HBITMAP bmp = CreateDIBSection(sdc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
+    HGDIOBJ ob = SelectObject(m, bmp);
+    splash_paint(h, m);
+    GdiFlush();
+    if (FILE *f = _wfopen(bmp_out, L"wb")) {
+        BITMAPFILEHEADER fh = { 0x4D42, (DWORD)(sizeof(fh) + sizeof(BITMAPINFOHEADER) + 420 * 260 * 4), 0, 0, (DWORD)(sizeof(fh) + sizeof(BITMAPINFOHEADER)) };
+        fwrite(&fh, sizeof(fh), 1, f); fwrite(&bi.bmiHeader, sizeof(BITMAPINFOHEADER), 1, f); fwrite(bits, 420 * 260 * 4, 1, f); fclose(f);
+    }
+    SelectObject(m, ob); DeleteObject(bmp); DeleteDC(m); ReleaseDC(NULL, sdc); DestroyWindow(h);
+
+    json r;
+    g_hold_main = true;
+    g_cbt = SetWindowsHookExW(WH_CBT, cbt_proc, NULL, GetCurrentThreadId());
+    webview::webview w(false, nullptr);
+    UnhookWindowsHookEx(g_cbt); g_cbt = NULL;
+    g_hwnd = (HWND)w.window().value();
+    r["subclassed"] = g_wv_proc != NULL;
+    r["visibleBeforeReady"] = (bool)IsWindowVisible(g_hwnd);
+    w.bind("uiReady", [&](const std::string &) {
+        r["readyCalled"] = true;
+        main_window_ready();
+        r["visibleAfterReady"] = (bool)IsWindowVisible(g_hwnd);
+        w.dispatch([&w] { w.terminate(); });
+        return std::string("{}");
+    });
+    SetTimer(NULL, 0, 20000, [](HWND, UINT, UINT_PTR, DWORD) { ExitProcess(3); });
+    w.set_html("<html><body><script>setTimeout(() => uiReady(), 30)</script></body></html>");
+    w.run();
+    std::string t = r.dump(2);
+    if (FILE *f = _wfopen(json_out, L"wb")) { fwrite(t.data(), 1, t.size(), f); fclose(f); }
+    return 0;
+}
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     int argc; wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argc >= 4 && wcscmp(argv[1], L"--selftest") == 0) return selftest(argv[2], argv[3]);
     if (argc >= 5 && wcscmp(argv[1], L"--n2n-helper") == 0) return n2n_helper(argv[2], argv[3], wcstoul(argv[4], NULL, 10));
     if (argc >= 4 && wcscmp(argv[1], L"--n2n-test") == 0) return n2n_test(argv[2], argv[3]);
+    if (argc >= 5 && wcscmp(argv[1], L"--split-helper") == 0) return split_helper(argv[2], argv[3], wcstoul(argv[4], NULL, 10));
+    if (argc >= 4 && wcscmp(argv[1], L"--split-selftest") == 0) return split_selftest(argv[2], argv[3]);
+    if (argc >= 4 && wcscmp(argv[1], L"--split-helper-test") == 0) {
+        // --split-helper-test <game dir> <out.json>: the network helper without the UAC prompt (unelevated, so Windows
+        // refuses the change): checks the pipe, the PowerShell scripts and the error path. Changes nothing.
+        init_dir(argv[2]);
+        g_split_verb = L"open";
+        json r;
+        std::string reply, err;
+        HANDLE h = split_helper_start({ {"op", "session"}, {"iface", "EXVS test adapter that does not exist"}, {"ips", {"192.0.2.250"}}, {"prefix", 24} }, reply, err);
+        if (h) CloseHandle(h);
+        r["session"] = { {"reply", reply}, {"error", err} };
+        reply.clear(); err.clear();
+        h = split_helper_start({ {"op", "cleanup"}, {"iface", "EXVS test adapter that does not exist"}, {"ips", {"192.0.2.250"}} }, reply, err);
+        if (h) CloseHandle(h);
+        r["cleanup"] = { {"reply", reply}, {"error", err} };
+        r["scripts"] = { net_add_script("Wi-Fi", { "192.0.2.250", "192.0.2.249" }, 24), net_remove_script("Wi-Fi", { "192.0.2.250" }, true) };
+        FILE *f = _wfopen(argv[3], L"wb"); if (!f) return 2;
+        std::string t = r.dump(2); fwrite(t.data(), 1, t.size(), f); fclose(f);
+        return 0;
+    }
+    if (argc >= 5 && wcscmp(argv[1], L"--splash-test") == 0) { init_dir(argv[2]); CoInitializeEx(NULL, COINIT_APARTMENTTHREADED); return splash_test(argv[3], argv[4]); }
     if (argc >= 3 && wcscmp(argv[1], L"--update-test") == 0) {   // --update-test <out.json> [install]: check (+ download and swap), no window
         init_dir(NULL);
         json r = { {"check", check_update()} };
@@ -1180,7 +1543,15 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
             RegisterClassW(&wc);
             test_parent = CreateWindowW(wc.lpszClassName, L"EXVS Launcher test", WS_OVERLAPPEDWINDOW, 0, 0, 1100, 680, NULL, NULL, wc.hInstance, NULL);
         }
+        if (!uitest) {
+            splash_show();
+            g_hold_main = true;
+            g_cbt = SetWindowsHookExW(WH_CBT, cbt_proc, NULL, GetCurrentThreadId());
+        }
         webview::webview w(false, uitest ? (void *)&test_parent : nullptr);
+        if (g_cbt) { UnhookWindowsHookEx(g_cbt); g_cbt = NULL; }
+        if (!uitest) g_ready_timer = SetTimer(NULL, 0, 15000, [](HWND, UINT, UINT_PTR, DWORD) { main_window_ready(); });   // the page never said it's ready
+        w.bind("uiReady", [](const std::string &) { main_window_ready(); return std::string("{}"); });
         w.set_title("EXVS Launcher");
         w.set_size(1100, 680, WEBVIEW_HINT_NONE);
         if (!uitest) w.set_size(960, 600, WEBVIEW_HINT_MIN);
@@ -1238,9 +1609,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
             std::lock_guard<std::mutex> l(g_mx);
             json log = json::array();
             for (size_t i = from; i < g_log.size(); i++) log.push_back(g_log[i]);
-            json st = { {"client", !find_procs(CLIENT_EXE, true).empty()}, {"lm", !find_procs(LM_EXE, true).empty()},
+            json st = { {"client", !find_procs(CLIENT_EXE, true).empty()}, {"lm", lm_running()},
                         {"server", server_running()}, {"busy", g_busy}, {"update", update_progress()}, {"log", log}, {"logTotal", g_log.size()},
                         {"n2n", { {"running", (bool)g_n2n_running}, {"connected", (bool)g_n2n_connected}, {"ip", g_n2n_ip} }} };
+            st["split"] = split_status();
             return st.dump();
         });
         async("play", [&](json a) {
@@ -1251,15 +1623,18 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
             return r;
         });
         async("stopGame", [](json) { stop_game(); return json({ {"ok", true} }); });
+        async("splitStart", [&](json) { return do_split(last_state); });
+        async("splitStop", [](json) { split_stop(); return json({ {"ok", true} }); });
+        async("splitCleanup", [](json) { return split_cleanup(); });
+        async("splitPads", [](json) { return split_pads(); });
         async("n2nStart", [&](json) { return n2n_start(last_state); });
         async("n2nStop", [](json) { n2n_stop(); return json({ {"ok", true} }); });
         async("serverStart", [](json) {
-            std::wstring s = server_exe();
-            if (s.empty()) return json({ {"ok", false}, {"error", "Server.exe not found"} });
-            if (server_running()) return json({ {"ok", true} });
-            return json({ {"ok", start_process(s, L"", s.substr(0, s.find_last_of(L'\\')), CREATE_NEW_CONSOLE)} });
+            std::string err = start_server();
+            return err.empty() ? json({ {"ok", true} }) : json({ {"ok", false}, {"error", err} });
         });
-        async("serverStop", [](json) { kill_procs(L"Server.exe", true); return json({ {"ok", true} }); });
+        async("serverStop", [](json) { kill_at(server_exe()); return json({ {"ok", true} }); });
+        w.bind("pickExe", [](const std::string &) { return pick_exe().dump(); });
         async("listControllers", [](json) {
             json out = json::array();
             for (auto &d : list_devices()) {
@@ -1311,6 +1686,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
         w.run();
     } catch (const std::exception &e) {
         log_line("fatal: %s", e.what());
+        if (g_cbt) { UnhookWindowsHookEx(g_cbt); g_cbt = NULL; }
+        if (g_splash) { DestroyWindow(g_splash); g_splash = NULL; }
         MessageBoxW(NULL, (L"EXVS Launcher could not start:\n" + widen(e.what()) +
                            L"\n\nIt needs the Microsoft Edge WebView2 Runtime (included in Windows 11).").c_str(), L"EXVS Launcher", MB_ICONERROR);
         return 1;
