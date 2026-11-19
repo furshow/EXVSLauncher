@@ -253,6 +253,46 @@ body.pad .pad-hint { display: block; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; background: #151c2e; border: 1px solid var(--line-strong); padding: 10px 18px; border-radius: 10px; transition: .25s; pointer-events: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 50; }
 .toast.show { opacity: 1; transform: translateX(-50%); }
 .toast.err { border-color: var(--red); }
+
+/* ---------- splitscreen ---------- */
+.sp-top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
+.sp-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.sp-opts .wide { grid-column: 1 / -1; }
+.sp-opts select { width: 100%; min-width: 0; padding: 9px 11px; border-radius: 9px; }
+.sp-opts .ds { color: var(--dim); font-size: 12px; }
+.fl { display: block; font: 600 11px var(--head); text-transform: uppercase; letter-spacing: 1.3px; color: var(--muted); margin-bottom: 5px; }
+.sp-count { display: flex; gap: 8px; margin-bottom: 16px; }
+.sp-count button { flex: 1; border: 1px solid var(--line-strong); background: #0d1220; color: var(--muted); border-radius: 10px; padding: 10px 0 8px; cursor: pointer; font: 600 22px var(--head); letter-spacing: 1px; transition: .15s; }
+.sp-count button small { display: block; font: 600 10.5px var(--head); letter-spacing: 1.6px; text-transform: uppercase; margin-top: 2px; }
+.sp-count button:hover { color: var(--text); border-color: var(--accent); }
+.sp-count button.on { background: linear-gradient(180deg, rgba(47,140,255,0.28), rgba(47,140,255,0.1)); border-color: var(--accent); color: #fff; box-shadow: 0 0 16px rgba(47,140,255,0.25); }
+.sp-preview { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; background: #000; border: 1px solid var(--line-strong); overflow: hidden; }
+.sp-preview .tile { position: absolute; display: grid; place-items: center; font: 600 15px var(--head); letter-spacing: 1.5px; color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--pc) 45%, #0b1020), #0b1020 80%); outline: 1px solid color-mix(in srgb, var(--pc) 70%, transparent); outline-offset: -1px; transition: .2s; }
+.sp-preview .tile.hit { box-shadow: inset 0 0 0 3px var(--pc), inset 0 0 30px color-mix(in srgb, var(--pc) 60%, transparent); }
+.sp-mon { color: var(--dim); font-size: 12px; margin-top: 8px; text-align: center; }
+.sp-screens { display: flex; gap: 12px; align-items: flex-start; }
+.sp-scr { min-width: 0; }
+.sp-scr .sp-mon { margin-top: 5px; }
+.sp-players { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.sp-card { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 14px; transition: border-color .15s, box-shadow .2s; }
+.sp-card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; border-radius: 14px 14px 0 0; background: var(--pc); opacity: .85; }
+.sp-card.hit { border-color: var(--pc); box-shadow: 0 0 22px color-mix(in srgb, var(--pc) 40%, transparent); }
+.sp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.sp-badge { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; font: 700 16px var(--head); color: #fff; background: var(--pc); box-shadow: 0 0 14px color-mix(in srgb, var(--pc) 55%, transparent); }
+.sp-head .tt { font: 600 16px var(--head); letter-spacing: .4px; }
+.sp-head .ds { color: var(--dim); font-size: 12px; }
+.sp-head .ds.ok { color: var(--green); } .sp-head .ds.bad { color: var(--amber); }
+.sp-card .fl { margin: 12px 0 5px; }
+.sp-card select, .sp-card input { width: 100%; min-width: 0; box-sizing: border-box; }
+.sp-two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; align-items: end; }
+.sp-foot { display: flex; align-items: center; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+.sp-foot .busy { margin: 0; }
+.sp-note { color: var(--dim); font-size: 12px; margin: 14px 0 0; line-height: 1.45; }
+.sp-warn { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; border: 1px solid rgba(255,181,71,0.4); background: rgba(255,181,71,0.08); color: #ffd9a0; }
+.sp-warn[hidden] { display: none; }
+.sp-warn .btn { margin-left: auto; }
+@media (max-width: 980px) { .sp-top { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -260,6 +300,7 @@ body.pad .pad-hint { display: block; }
   <nav class="nav">
     <div class="logo" title="EXVS Launcher"><!--LOGO--></div>
     <button data-page="play" class="active" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play</button>
+    <button data-page="split" title="Splitscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="8" height="7" rx="1.5"/><rect x="13" y="4" width="8" height="7" rx="1.5"/><rect x="3" y="13" width="8" height="7" rx="1.5"/><rect x="13" y="13" width="8" height="7" rx="1.5"/></svg>Split</button>
     <button data-page="settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Settings</button>
     <button data-page="online" title="Online"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg>Online</button>
     <button data-page="mods" title="Mods"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>Mods</button>
@@ -303,6 +344,38 @@ body.pad .pad-hint { display: block; }
         <div class="busy" id="busy"></div>
       </div>
       <div class="pad-hint"><span class="gb sh">START</span>Play &nbsp; <span class="gb x">X</span>Mode &nbsp; <span class="gb sh">LT</span><span class="gb sh">RT</span>Pages</div>
+    </section>
+
+    <!-- SPLITSCREEN -->
+    <section class="page" id="page-split">
+      <h1>Splitscreen <span class="pill off" id="sp-pill">Stopped</span></h1>
+      <p class="sub">Up to 4 players on this PC: one copy of the game per player, side by side on one monitor, each with their own controller and card.</p>
+      <div class="sp-warn" id="sp-left" hidden><span id="sp-left-text"></span><button class="btn" id="sp-clean">Clean up</button></div>
+      <div class="sp-warn" id="sp-ov" hidden><span>Splitscreen needs the EXVS Overlay: it gives each copy of the game its own controller.</span><button class="btn primary" id="sp-ov-btn">Install overlay</button></div>
+      <div class="sp-top">
+        <div class="card" style="padding-bottom:16px">
+          <div class="sp-count" id="sp-count">
+            <button data-n="2">2<small>Players</small></button><button data-n="3">3<small>Players</small></button><button data-n="4">4<small>Players</small></button>
+          </div>
+          <div class="sp-opts">
+            <div class="wide"><label class="fl">Network adapter</label><select id="sp-iface"></select></div>
+            <div class="wide"><label class="fl">Resolution (each copy)</label><select id="sp-res"></select></div>
+            <div class="wide ip-row" style="margin-top:2px"><div><div class="fl" style="margin:0">Start the Live Monitor</div><div class="ds">Needed to play against each other. Turn it off if your group's Live Monitor runs on another PC.</div></div><label class="switch"><input type="checkbox" id="sp-lm"><span></span></label></div>
+            <div class="wide ip-row" style="margin-top:0"><div><div class="fl" style="margin:0">Free play</div><div class="ds">No coins needed on any copy. The debug menu options turned on in your client also apply to every player.</div></div><label class="switch"><input type="checkbox" id="sp-free"><span></span></label></div>
+          </div>
+          <p class="sp-note">Every copy is a cabinet of its own and needs its own address on this network (your Ethernet or Wi-Fi). They are added while splitscreen runs (Windows asks for permission) and removed when the last copy closes.</p>
+        </div>
+        <div class="card" style="padding-bottom:14px">
+          <label class="fl" style="margin-bottom:8px">Layout</label>
+          <div class="sp-screens" id="sp-preview"></div>
+          <div class="sp-mon" id="sp-mon"></div>
+        </div>
+      </div>
+      <div class="sp-players" id="sp-players"></div>
+      <div class="sp-foot">
+        <button class="btn primary big" id="sp-start">Start splitscreen</button>
+        <span class="busy" id="sp-busy"></span>
+      </div>
     </section>
 
     <!-- SETTINGS (game menu style) -->
@@ -455,7 +528,7 @@ function t(s, vars) {
   return r;
 }
 window.__i18nMissing = lang => [...I18N_SEEN].filter(k => !(window.I18N && I18N[lang] && I18N[lang][k]) && /[A-Za-z]{2}/.test(k));
-const NO_I18N = "script, style, #opts, #info, #cats, #ctrl-body, #n2n-log, .iface-sel, #q-display, #q-res, #q-card, #q-server, #cr-ver, .cr-name, #ov-text, #up-text, #upd-title, #upd-ver, #upd-notes, #toast, svg";
+const NO_I18N = "script, style, #sp-players, #sp-preview, #sp-mon, #sp-iface, #sp-monitor, #sp-res, #sp-busy, #sp-left-text, #sp-pill, #sp-start, #sp-ov-btn, #opts, #info, #cats, #ctrl-body, #n2n-log, .iface-sel, #q-display, #q-res, #q-card, #q-server, #cr-ver, .cr-name, #ov-text, #up-text, #upd-title, #upd-ver, #upd-notes, #toast, svg";
 function translateStatic() {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -477,7 +550,7 @@ function setLang(code) {
   LANG = LANGS.some(l => l[0] === code) ? code : "en";
   document.documentElement.lang = LANG;
   translateStatic();
-  if (S) { renderCats(); renderOpts(); renderQuick(); renderOverlayBanner(); }
+  if (S) { renderCats(); renderOpts(); renderQuick(); renderOverlayBanner(); renderSplit(); }
 }
 
 // ================================================================ backend bridge
@@ -485,7 +558,7 @@ function setLang(code) {
 const HAS_HOST = typeof window.getState === "function";
 const mock = {
   state: {
-    version: "1.1.0", gameDir: "C:\\Games\\EXVSIB", monitor: { w: 1920, h: 1080 },
+    version: "1.2.0", gameDir: "C:\\Games\\EXVSIB", monitor: { w: 1920, h: 1080 },
     files: { client: true, lm: true, edge: true, server: true, modManager: true, overlay: true, overlayStatus: "outdated", overlayVersion: "0.10.0" },
     cfg: { chipId: "Player1", accessCode: "0000", serial: "XXXX", server: "", region: 40, openingSkip: 3, bootToken: "",
       disableSocketHook: false, enableQuickSkinChange: true, framerateLimit: true, useRealCardReader: false, cardReaderComPort: "",
@@ -495,8 +568,13 @@ const mock = {
     controller: [{ Enabled: "False", Name: "Wireless Controller", ButtonA: "1", ButtonB: "4", ButtonC: "2", ButtonD: "3", ButtonAB: "6", ButtonBC: "8", ButtonAC: "7", ButtonABC: "12", Coin: "14", Card: "13", Start: "10,5", Test: "9", Service: "15", Kill: "13", TestBool: "True", ServiceBool: "False", KillBool: "False" },
       { Enabled: "False", Name: "Controller (Xbox One For Windows)", ButtonA: "1,5", ButtonB: "4", ButtonC: "2", ButtonD: "3", Coin: "14", Card: "14", Start: "10,11", Test: "9" }],
     n2n: { host: "", community: "", playerName: "Player1", virtualIp: "", dhcp: true, relay: false, noPortForwarding: false, multicast: true, iface: "N2N", conf: "" },
-    app: { mode: "client", syncMods: false, closeOnPlay: false, streamer: false },
+    app: { mode: "client", syncMods: false, closeOnPlay: false, streamer: false, autoServer: false },
+    programs: { lm: "", lmList: ["LiteMonitor\\LiteMonitor.exe"], lmDefault: "vsac29_Release_LM.exe", server: "", serverList: [], serverAuto: "Server-Infinite\\Server-Infinite.exe", found: { "LiteMonitor\\LiteMonitor.exe": true } },
     interfaces: ["Gundam", "Ethernet", "Wi-Fi", "N2N", "N2N-LM"], background: null,
+    split: { players: 2, iface: "Ethernet", resolution: 3, monitor: 0, startLM: true, freePlay: true, monitors: [{ w: 1920, h: 1080, primary: true }, { w: 2560, h: 1440, primary: false }],
+      p: [{ input: "xinput:0", chipId: "Player1", accessCode: "0000", serial: "XXXX", monitor: 0 }, { input: "xinput:1", chipId: "Player1_P2", accessCode: "0000", serial: "k3Zp", monitor: 0 },
+          { input: "keyboard", chipId: "Player1_P3", accessCode: "0000", serial: "Q7mw", monitor: 1 }, { input: "xinput:3", chipId: "Player1_P4", accessCode: "0000", serial: "fa2D", monitor: 1 }],
+      pending: { ips: "", iface: "", converted: false } },
   },
   status: { client: false, lm: false, server: false, n2n: { running: false, connected: false, ip: "" }, log: [], busy: "" },
 };
@@ -508,6 +586,7 @@ async function call(name, ...args) {
     case "checkUpdate": return { ok: true, available: true, current: mock.state.version, version: "1.9.1", size: 2400000,
       notes: "## What's new\n- **Automatic updates** for the launcher and the overlay.\n- Fixes.\n\nThanks for playing!" };
     case "padState": { const ph = Math.floor(performance.now() / 600) % 8; return { connected: true, buttons: [ph + 1], pov: ph * 45, x: 0, y: 0 }; }
+    case "splitPads": { const ph = Math.floor(performance.now() / 900) % 4; return { xinput: [0, 1, 2, 3].map(i => ({ slot: i, connected: i < 2, pressed: i === ph && i < 2 })), devices: ["Hori Fighting Stick mini"] }; }
     case "listControllers": return [{ name: "Controller (Xbox One For Windows)", xinput: true }, { name: "Wireless Controller", xinput: false }];
     default: return { ok: true };
   }
@@ -580,6 +659,7 @@ function bindForm() {
 function showPage(name) {
   $$(".nav button[data-page]").forEach(x => x.classList.toggle("active", x.dataset.page === name));
   $$(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + name));
+  if (name === "split") spWatchPads(); else spStopPads();
 }
 for (const b of $$(".nav button[data-page]")) b.onclick = () => showPage(b.dataset.page);
 for (const q of $$(".quick .q[data-goto]")) q.onclick = () => { showPage("settings"); openCat(q.dataset.goto); };
@@ -671,6 +751,14 @@ const CATS = {
     { section: "Privacy" },
     toggle({ label: "Streamer mode", desc: "Hides your card server address and access code in the launcher, so you can show it on stream. The game still uses them as usual.",
       get: () => !!S.app.streamer, set: v => { S.app.streamer = v; renderQuick(); } }),
+    { section: "Programs" },
+    cycle({ label: "Live Monitor program", desc: "Which Live Monitor the Play button starts: the game's own (vsac29_Release_LM.exe) or another one you added, like LiteMonitor. Add… picks an .exe; then switch between them here.",
+      values: () => ["Game's Live Monitor", ...progList("lm").map(progLabel)], get: () => progIdx("lm"), set: v => progSet("lm", v), extra: () => progExtra("lm") }),
+    cycle({ label: "Card server program", desc: "Which card server the Start button (Online) and the option below start. Auto looks for Server.exe or Server-Infinite.exe in the game folder.",
+      values: () => [S.programs?.serverAuto ? t("Auto · {p}", { p: S.programs.serverAuto }) : "Auto · not found", ...progList("server").map(progLabel)],
+      get: () => progIdx("server"), set: v => progSet("server", v), extra: () => progExtra("server") }),
+    toggle({ label: "Start card server with the game", desc: "When you press Play, the card server program starts first (if it isn't running yet). Use it with Card server: Local · this PC.",
+      get: () => !!S.app.autoServer, set: v => S.app.autoServer = v }),
     { section: "Look" },
     { type: "actions", label: "Background picture", desc: "Picture behind the Play screen (JPG, PNG or WEBP).",
       actions: [["Choose…", async () => { const r = await call("pickBackground"); if (r && r.dataUrl) setBackground(r.dataUrl); else if (r && r.error) toast(r.error, true); }],
@@ -1084,6 +1172,43 @@ function renderOverlayBanner() {
     : t("<b>EXVS Overlay {v}</b> is available: update the one in your game folder.", { v: esc(S.files.overlayVersion) });
   $("#ov-btn").textContent = t(st === "missing" ? "Install" : "Update");
 }
+// ---------------- Programs (Live Monitor / card server exe lists, Settings › Gameplay)
+function progs() { return S.programs || (S.programs = { lm: "", lmList: [], server: "", serverList: [], found: {} }); }
+function progList(k) { const p = progs(); return p[k + "List"] || (p[k + "List"] = []); }
+function progLabel(path) { const n = path.split(/[\\/]/).pop(); return n === path ? n : `${n}  · ${path}`; }
+function progIdx(k) { const cur = progs()[k] || ""; return cur ? Math.max(0, progList(k).indexOf(cur) + 1) : 0; }
+function progSet(k, v) {
+  const p = progs(); p[k] = v === 0 ? "" : progList(k)[v - 1] || "";
+  if (k === "server") { S.files.serverPath = p.server || p.serverAuto || ""; S.files.server = !!S.files.serverPath; }
+}
+function progExtra(k) {
+  const p = progs(), cur = p[k] || "";
+  let h = "";
+  if (cur) {
+    h += `<p>${esc(cur)}</p>`;
+    if (p.found && p.found[cur] === false) h += `<p class="warn">${t("This file was not found.")}</p>`;
+  } else if (k === "server" && !p.serverAuto) h += `<p class="warn">${t("No card server found in the game folder. Use Add… to pick it.")}</p>`;
+  h += `<div class="acts"><button class="btn primary" onclick="progAdd('${k}')">${t("Add…")}</button>`;
+  if (cur) h += `<button class="btn" onclick="progRemove('${k}')">${t("Remove from list")}</button>`;
+  return h + `</div>`;
+}
+async function progAdd(k) {
+  const r = await call("pickExe");
+  if (!r || !r.path) return;
+  const list = progList(k);
+  if (!list.some(x => x.toLowerCase() === r.path.toLowerCase())) list.push(r.path);
+  progs()[k] = list.find(x => x.toLowerCase() === r.path.toLowerCase());
+  (progs().found ||= {})[progs()[k]] = true;
+  if (k === "server") { S.files.server = true; S.files.serverPath = progs().server; }
+  changed(); renderOpts();
+}
+function progRemove(k) {
+  const p = progs(), cur = p[k];
+  p[k + "List"] = progList(k).filter(x => x !== cur);
+  progSet(k, 0);
+  changed(); renderOpts();
+}
+
 async function installOverlayNow() {
   const r = await call("installOverlay");
   if (r && r.ok === false) { toast(r.error, true); return; }
@@ -1194,6 +1319,7 @@ async function poll() {
     $("#tagline").textContent = t(st.busy || (running ? "Good luck out there, pilot." : "Ready to deploy."));
     $("#busy").textContent = t(st.busy || "");
     if (updating && st.update) renderUpdateBanner(st.update);
+    spStatus(st);
     $("#mm-status").textContent = /sync/i.test(st.busy || "") ? t(st.busy) : "";
     const np = $("#n2n-pill"); np.textContent = t(n.connected ? "Connected" : n.running ? "Connecting" : "Disconnected"); np.className = "pill" + (n.connected ? "" : " off");
     const sp = $("#server-pill"); sp.textContent = t(st.server ? "Running" : "Stopped"); sp.className = "pill" + (st.server ? "" : " off");
@@ -1225,9 +1351,154 @@ $("#mm-sync").onclick = async () => {
 };
 function setBackground(url) { const h = $("#hero"); if (url) { h.classList.remove("default"); h.style.backgroundImage = `url("${url}")`; } else { h.classList.add("default"); h.style.backgroundImage = ""; } }
 
+// ================================================================ splitscreen page
+const SP_COLORS = ["#2f8cff", "#ff3d55", "#ffb547", "#2fd98b"];
+const SP_RES = [3, 4, 2, 1, 0, 5, 6];   // 720p first: lighter, and the tiles are small anyway
+let spPads = { xinput: [], devices: [] }, spPadTimer = 0, spRunning = false, spStarting = false;
+
+const spMons = () => (S.split.monitors && S.split.monitors.length ? S.split.monitors : [S.monitor || { w: 1920, h: 1080, primary: true }]);
+const spMonOf = p => (p.monitor >= 0 && p.monitor < spMons().length ? p.monitor : 0);   // an unplugged monitor -> the first one
+function spTiles(count, m) {   // same grid as the launcher (split.h split_tile), in % of the monitor
+  const cols = count <= 1 ? 1 : 2, rows = count <= 2 ? 1 : 2, cw = m.w / cols, ch = m.h / rows;
+  let tw = cw, th = cw * 9 / 16; if (th > ch) { th = ch; tw = ch * 16 / 9; }
+  const gx = (m.w - tw * cols) / 2, gy = (m.h - th * rows) / 2, out = [];
+  for (let i = 0; i < count; i++) {
+    let x = gx + (i % cols) * tw; const y = gy + Math.floor(i / cols) * th;
+    if (count === 3 && i === 2) x = (m.w - tw) / 2;
+    out.push({ l: x / m.w * 100, t: y / m.h * 100, w: tw / m.w * 100, h: th / m.h * 100, px: Math.round(tw) + "×" + Math.round(th) });
+  }
+  return out;
+}
+// one box per monitor in use, with its players' windows (players on the same monitor share it, in player order)
+function renderSplitPreview() {
+  const sp = S.split, mons = spMons(), players = sp.p.slice(0, sp.players).map((p, i) => ({ i, m: spMonOf(p) }));
+  const used = [...new Set(players.map(x => x.m))].sort((a, b) => a - b);
+  const notes = [];
+  $("#sp-preview").innerHTML = used.map(mi => {
+    const m = mons[mi], on = players.filter(x => x.m === mi), tiles = spTiles(on.length, m);
+    notes.push(t("Monitor {n}", { n: mi + 1 }) + ": " + (on.length === 1 ? t("1 window {size}", { size: tiles[0].px }) : t("{count} windows {size}", { count: on.length, size: tiles[0].px })));
+    return `<div class="sp-scr" style="flex:${(m.w / m.h).toFixed(3)} 1 0"><div class="sp-preview" style="aspect-ratio:${m.w} / ${m.h}">` +
+      on.map((x, k) => { const r = tiles[k]; return `<div class="tile" data-n="${x.i}" style="--pc:${SP_COLORS[x.i]};left:${r.l}%;top:${r.t}%;width:${r.w}%;height:${r.h}%">P${x.i + 1}</div>`; }).join("") +
+      `</div><div class="sp-mon">${esc(t("Monitor {n}", { n: mi + 1 }))}${m.primary ? " · " + esc(t("main")) : ""}</div></div>`;
+  }).join("");
+  $("#sp-mon").textContent = notes.join("  ·  ");
+}
+function spInputOptions(cur) {
+  const o = [];
+  for (let i = 0; i < 4; i++) { const x = spPads.xinput[i]; o.push([`xinput:${i}`, t("Controller {n} · Xbox / XInput", { n: i + 1 }) + (x && !x.connected ? " — " + t("not connected") : "")]); }
+  o.push(["keyboard", t("Keyboard")]);
+  for (const d of spPads.devices) o.push(["di:" + d, d + " · DirectInput"]);
+  if (cur && cur.startsWith("di:") && !o.some(x => x[0] === cur)) o.push([cur, cur.slice(3) + " — " + t("not connected")]);
+  return o;
+}
+function spInputState(inp) {   // [text, class]
+  if (inp === "keyboard") return [t("Plays on the keyboard"), "ok"];
+  if (inp.startsWith("xinput:")) { const x = spPads.xinput[+inp.slice(7)]; return x && x.connected ? [t("Connected · press a button to check"), "ok"] : [t("Controller not connected"), "bad"]; }
+  if (inp.startsWith("di:")) return spPads.devices.includes(inp.slice(3)) ? [t("Connected"), "ok"] : [t("Controller not connected"), "bad"];
+  return [t("Choose a controller"), "bad"];
+}
+function renderSplit() {
+  const sp = S && S.split; if (!sp) return;
+  for (const b of $$("#sp-count button")) b.classList.toggle("on", +b.dataset.n === sp.players);
+  const ifs = [...new Set([...(S.interfaces || []), sp.iface].filter(Boolean))];
+  if (!sp.iface) sp.iface = ifs.find(n => /ethernet|wi-?fi|wlan|lan/i.test(n)) || ifs[0] || "";
+  $("#sp-iface").innerHTML = ifs.map(n => `<option${n === sp.iface ? " selected" : ""}>${esc(n)}</option>`).join("");
+  $("#sp-res").innerHTML = SP_RES.map(i => `<option value="${i}"${i === sp.resolution ? " selected" : ""}>${RES[i].label}</option>`).join("");
+  $("#sp-lm").checked = !!sp.startLM;
+  $("#sp-free").checked = sp.freePlay !== false;
+  renderSplitPreview();
+  const monOpts = cur => spMons().map((m, i) => `<option value="${i}"${i === cur ? " selected" : ""}>${esc(t("Monitor {n}", { n: i + 1 }))} · ${m.w}×${m.h}${m.primary ? " · " + esc(t("main")) : ""}</option>`).join("");
+  $("#sp-players").innerHTML = sp.p.slice(0, sp.players).map((p, i) => {
+    const [st, cls] = spInputState(p.input);
+    return `<div class="sp-card" data-n="${i}" style="--pc:${SP_COLORS[i]}">
+      <div class="sp-head"><span class="sp-badge">P${i + 1}</span><div><div class="tt">${esc(t("Player {n}", { n: i + 1 }))}</div><div class="ds ${cls}" data-st="${i}">${esc(st)}</div></div></div>
+      <label class="fl">${esc(t("Controller"))}</label>
+      <select data-f="input" data-n="${i}">${spInputOptions(p.input).map(([v, l]) => `<option value="${esc(v)}"${v === p.input ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>
+      <label class="fl">${esc(t("Screen"))}</label>
+      <select data-f="monitor" data-n="${i}">${monOpts(spMonOf(p))}</select>
+      <div class="sp-two"><div><label class="fl">${esc(t("Card (chip ID)"))}</label><input type="text" data-f="chipId" data-n="${i}" value="${esc(p.chipId)}"></div>
+      <div><label class="fl">${esc(t("Access code"))}</label><input type="text" data-f="accessCode" data-n="${i}" value="${esc(p.accessCode)}"></div></div>
+    </div>`;
+  }).join("");
+  for (const el of $$("#sp-players [data-f]")) el.onchange = () => {
+    const f = el.dataset.f;
+    S.split.p[+el.dataset.n][f] = f === "monitor" ? +el.value : el.value.trim(); changed();
+    if (f === "input") renderSplit();
+    if (f === "monitor") renderSplitPreview();
+  };
+  const left = !!(sp.pending && sp.pending.ips) && !spRunning;
+  $("#sp-left").hidden = !left;
+  if (left) $("#sp-left-text").textContent = t("The network addresses of the last splitscreen session are still on '{iface}' ({ips}).", { iface: sp.pending.iface, ips: sp.pending.ips });
+  const ov = S.files.overlayStatus;
+  $("#sp-ov").hidden = !(ov === "missing" || ov === "outdated");
+  $("#sp-ov-btn").textContent = t(ov === "outdated" ? "Update overlay" : "Install overlay");
+  spRenderButton();
+}
+function spRenderButton() {
+  const b = $("#sp-start");
+  b.textContent = t(spRunning ? "Stop splitscreen" : "Start splitscreen");
+  b.classList.toggle("primary", !spRunning); b.classList.toggle("danger", spRunning);
+  b.disabled = spStarting;
+}
+for (const b of $$("#sp-count button")) b.onclick = () => { S.split.players = +b.dataset.n; changed(); renderSplit(); };
+$("#sp-iface").onchange = e => { S.split.iface = e.target.value; changed(); };
+$("#sp-res").onchange = e => { S.split.resolution = +e.target.value; changed(); };
+$("#sp-lm").onchange = e => { S.split.startLM = e.target.checked; changed(); };
+$("#sp-free").onchange = e => { S.split.freePlay = e.target.checked; changed(); };
+$("#sp-ov-btn").onclick = async () => {
+  const r = await call("installOverlay");
+  if (r && r.ok === false) return toast(r.error, true);
+  S.files.overlay = true; S.files.overlayStatus = "current"; renderOverlayBanner(); renderSplit(); toast("Overlay installed");
+};
+$("#sp-clean").onclick = async () => {
+  const r = await call("splitCleanup");
+  if (r && r.ok === false) return toast(r.error, true);
+  S.split.pending = { ips: "", iface: "", converted: false }; renderSplit(); toast("Network cleaned up");
+};
+$("#sp-start").onclick = async () => {
+  if (spRunning) { if (confirm(t("Close every copy of the game?"))) await call("splitStop"); return; }
+  spStarting = true; spRenderButton();
+  await saveNow();
+  const r = await call("splitStart");
+  spStarting = false; spRenderButton();
+  if (r && r.ok === false) toast(r.error || "Could not start splitscreen", true);
+  else toast("Splitscreen started");
+  try { const s = await call("getState"); if (s && s.split) { S.split.pending = s.split.pending; renderSplit(); } } catch (e) { /* host busy */ }
+};
+async function spPollPads() {
+  try {
+    const r = await call("splitPads");
+    const key = x => JSON.stringify([(x.xinput || []).map(p => p.connected), x.devices]);
+    const before = key(spPads);
+    if (r && r.xinput) spPads = r;
+    if (key(spPads) !== before && !document.activeElement?.closest("#sp-players")) renderSplit();
+    else for (let i = 0; i < S.split.players; i++) { const [st, cls] = spInputState(S.split.p[i].input), el = $(`[data-st="${i}"]`); if (el) { el.textContent = st; el.className = "ds " + cls; } }
+    for (let i = 0; i < S.split.players; i++) {   // the player whose controller is pressed lights up
+      const inp = S.split.p[i].input, hit = inp.startsWith("xinput:") && spPads.xinput[+inp.slice(7)]?.pressed;
+      $(`.sp-card[data-n="${i}"]`)?.classList.toggle("hit", !!hit);
+      $(`#sp-preview .tile[data-n="${i}"]`)?.classList.toggle("hit", !!hit);
+    }
+  } catch (e) { /* host busy */ }
+  if (spPadTimer) spPadTimer = setTimeout(spPollPads, 200);
+}
+function spWatchPads() { if (!spPadTimer && S && S.split) { spPadTimer = 1; spPollPads(); } }
+function spStopPads() { clearTimeout(spPadTimer); spPadTimer = 0; }
+function spStatus(st) {
+  const sp = st.split || {};
+  const was = spRunning; spRunning = !!sp.running;
+  if (sp.starting) spStarting = true;
+  const pill = $("#sp-pill");
+  pill.textContent = spRunning ? t("Running · {n} players", { n: sp.players || 0 }) : t("Stopped"); pill.className = "pill" + (spRunning ? "" : " off");
+  $("#sp-busy").textContent = sp.starting ? t(st.busy || "") : spRunning && sp.ips && sp.ips.length ? t("Addresses: {ips}", { ips: sp.ips.join(", ") }) : "";
+  if (was !== spRunning) {
+    if (!spRunning) call("getState").then(s => { if (s && s.split) S.split.pending = s.split.pending; renderSplit(); }).catch(() => {});
+    else renderSplit();
+  } else spRenderButton();
+}
+
 // ================================================================ controller navigation (Gamepad API, standard mapping)
 // LT/RT pages · LB/RB categories · stick/D-pad move · A select · B back · X play mode · Start play.
-const PAGES = ["play", "settings", "online", "mods"];
+const PAGES = ["play", "split", "settings", "online", "mods"];
 const curPage = () => PAGES.find(p => $("#page-" + p).classList.contains("active"));
 let gpEl = null, padPrev = [], padHeld = null, padNext = 0, padWaitRelease = false;
 
@@ -1381,12 +1652,13 @@ requestAnimationFrame(padLoop);
     sync(); sw.addEventListener("change", sync);
   }
   const st = $("#n2n-static"); st.checked = !S.n2n.dhcp; st.onchange = () => { S.n2n.dhcp = !st.checked; changed(); };
-  renderCats(); renderOpts(); renderQuick(); renderOverlayBanner();
+  renderCats(); renderOpts(); renderQuick(); renderOverlayBanner(); renderSplit();
   setBackground(S.background);
+  setTimeout(() => call("uiReady"), 30);   // the host shows the window (and closes its splash) once the page is drawn
   const mmOk = !!S.files.modManager;
   $("#mm-open").disabled = !mmOk; $("#mm-sync").disabled = !mmOk; $("#sync-mods").disabled = !mmOk;
   if (!mmOk) $("#mm-status").textContent = t("EXVSIB_Mod_Manager.exe isn't in the game folder");
-  $("#server-path").textContent = S.files.server ? "" : t("Server.exe not found in the game folder");
+  $("#server-path").textContent = S.files.server ? (S.files.serverPath || "") : t("No card server program found. Pick one in Settings › Launcher › Programs.");
   $("#server-start").disabled = !S.files.server; $("#n2n-start").disabled = !S.files.edge;
   if (!S.files.client) toast("vsac29_Release.exe not found: put the launcher in the game folder", true);
   refreshDevices();
