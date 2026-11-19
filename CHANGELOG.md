@@ -3,7 +3,7 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
-## [Unreleased]
+## [1.2.1] - 2026-11-19
 ### Fixed
 - Splitscreen: with two DirectInput controllers of the same model (e.g. two DualSense), every copy read both.
   The launcher now lists each DirectInput controller on its own (numbered when several have the same name, and
