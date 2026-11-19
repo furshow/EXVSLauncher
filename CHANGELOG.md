@@ -3,6 +3,22 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
+## [Unreleased]
+### Fixed
+- Splitscreen: with two DirectInput controllers of the same model (e.g. two DualSense), every copy read both.
+  The launcher now lists each DirectInput controller on its own (numbered when several have the same name, and
+  lit up when pressed) and gives each copy only its player's device (`Path` in its `config.ini` instead of the
+  controller name). Players saved with a DirectInput controller in 1.2.0 keep it while only one connected
+  controller has that name; otherwise the page asks to choose which one.
+- Splitscreen: a copy could refuse to start with "Only one of InterfaceName and IpAddress can be specified in
+  config.ini" (after playing normally first). The player's `config.ini` kept the game folder's `InterfaceName` when
+  it appeared twice or the file started with a UTF-8 BOM; every `InterfaceName` / `IpAddress` line is now removed
+  before the player's address is written.
+- A fixed IP address for the Client or Live Monitor no longer leaves `InterfaceName` next to it in the config file.
+### Changed
+- Splitscreen: the Live Monitor the session started closes when the splitscreen ends (all copies closed or
+  **Stop**). A Live Monitor that was already running before the session is left open.
+
 ## [1.2.0] - 2026-11-19
 ### Splitscreen
 - New **Split** page: 2, 3 or 4 players on one PC. Each player gets a copy of the game and picks the **screen** it

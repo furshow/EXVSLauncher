@@ -11,15 +11,17 @@
 //     (this exe with --split-helper, one UAC prompt), and removed again when the last copy closes.
 //   - The EXVS Overlay (1.1.0 or newer) reads the [split] section of each config.ini: each copy only sees its
 //     own XInput controller, the keyboard only reaches the keyboard player, and the focus doesn't matter.
+//   - A DirectInput pad is given to its copy by device path ([controller] Path), not by name: see hid_pads().
 //   - The launcher places the windows (borderless) in a grid on the chosen monitor, over a black backdrop.
 
 static const char *SPLIT_OVERLAY_MIN = "1.1.0";
 static const wchar_t *SPLIT_STOP_EVENT = L"Local\\EXVSLauncher.SplitStop";
 static const wchar_t *g_split_verb = L"runas";   // --split-test uses "open"
 
-struct SplitPlayer { std::string input, chip, code, serial; int monitor = 0; };
+struct SplitPlayer { std::string input, chip, code, serial; int monitor = 0; std::string pad_path; };   // pad_path: DirectInput pad
 static std::mutex g_split_mx;
 static std::atomic<bool> g_split_running{false}, g_split_starting{false};
+static std::atomic<bool> g_split_lm_ours{false};   // this session started the Live Monitor: it closes with the session
 static std::vector<DWORD> g_split_pids;
 static std::vector<std::string> g_split_ips;
 static std::string g_split_error;
@@ -94,7 +96,123 @@ static void split_save_state(const json &sp) {
     }
 }
 
-// ---- controllers for the player list: XInput slots (with a live "pressed" flag) and DirectInput pads -----
+// ---- DirectInput-mode controllers, one entry per physical device ------------------------------------------
+// The loader (bngrw.dll) picks the HID devices of a [controller] section when ANY of these matches: Path = the
+// Raw Input device name (GetRawInputDeviceInfoA RIDI_DEVICENAME, compared exactly), Name = the HID product
+// string, or DeviceId 0-15 = the loader's arrival slot. Two identical pads (e.g. two DualSense) have the same
+// Name, so in splitscreen every copy would read both: each player's copy gets Path (and no Name) instead.
+struct HidPadInfo { std::string path, name; };
+typedef BOOLEAN (WINAPI *HidD_GetProductString_t)(HANDLE, PVOID, ULONG);
+static std::vector<HidPadInfo> hid_pads() {
+    static HidD_GetProductString_t product = [] {
+        HMODULE m = LoadLibraryExW(L"hid.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        return m ? (HidD_GetProductString_t)GetProcAddress(m, "HidD_GetProductString") : (HidD_GetProductString_t)NULL;
+    }();
+    std::vector<HidPadInfo> out;
+    UINT n = 0;
+    if (GetRawInputDeviceList(NULL, &n, sizeof(RAWINPUTDEVICELIST)) != 0 || !n) return out;
+    std::vector<RAWINPUTDEVICELIST> list(n + 8);
+    n = (UINT)list.size();
+    UINT got = GetRawInputDeviceList(list.data(), &n, sizeof(RAWINPUTDEVICELIST));
+    if (got == (UINT)-1) return out;
+    for (UINT i = 0; i < got; i++) {
+        if (list[i].dwType != RIM_TYPEHID) continue;
+        RID_DEVICE_INFO info = {}; info.cbSize = sizeof(info); UINT sz = sizeof(info);
+        if (GetRawInputDeviceInfoA(list[i].hDevice, RIDI_DEVICEINFO, &info, &sz) == (UINT)-1) continue;
+        if (info.hid.usUsagePage != 0x01 || (info.hid.usUsage != 0x04 && info.hid.usUsage != 0x05)) continue;   // joystick / gamepad
+        UINT len = 0;
+        GetRawInputDeviceInfoA(list[i].hDevice, RIDI_DEVICENAME, NULL, &len);
+        if (!len) continue;
+        std::string path(len, '\0');
+        UINT r = GetRawInputDeviceInfoA(list[i].hDevice, RIDI_DEVICENAME, &path[0], &len);
+        if (r == (UINT)-1 || r == 0) continue;
+        path.resize(strlen(path.c_str()));
+        std::string low = path; for (auto &ch : low) ch = (char)tolower((unsigned char)ch);
+        if (low.find("ig_") != std::string::npos) continue;   // an XInput pad: it's listed as an XInput slot
+        std::string name;
+        HANDLE h = CreateFileA(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+        if (h != INVALID_HANDLE_VALUE) {
+            wchar_t w[128] = {};
+            if (product && product(h, w, sizeof(w) - sizeof(wchar_t))) name = narrow(w);
+            CloseHandle(h);
+        }
+        if (trim(name).empty()) name = "Controller";
+        if (pad_is_xinput(name)) continue;
+        out.push_back({ path, trim(name) });
+    }
+    return out;
+}
+static bool same_path(std::string a, std::string b) {
+    for (auto &ch : a) ch = (char)tolower((unsigned char)ch);
+    for (auto &ch : b) ch = (char)tolower((unsigned char)ch);
+    if (a.size() > 4 && (a.compare(0, 4, "\\??\\") == 0)) a[1] = '\\';
+    if (b.size() > 4 && (b.compare(0, 4, "\\??\\") == 0)) b[1] = '\\';
+    return a == b;
+}
+
+// "Pressed" flags for the HID pads, read through DirectInput (the device's DIPROP_GUIDANDPATH path is the same
+// device interface as the Raw Input name). The devices stay open between polls of the Splitscreen page.
+struct SplitDi { std::string path; IDirectInputDevice8W *dev; };
+static std::mutex g_split_di_mx;
+static std::vector<SplitDi> g_split_di;
+static std::vector<bool> hid_pads_pressed(const std::vector<HidPadInfo> &pads) {
+    std::lock_guard<std::mutex> l(g_split_di_mx);
+    std::vector<bool> pressed(pads.size(), false);
+    // close the devices that went away
+    for (size_t i = 0; i < g_split_di.size();) {
+        bool keep = false;
+        for (auto &p : pads) if (same_path(p.path, g_split_di[i].path)) keep = true;
+        if (keep) { i++; continue; }
+        g_split_di[i].dev->Unacquire(); g_split_di[i].dev->Release();
+        g_split_di.erase(g_split_di.begin() + i);
+    }
+    bool missing = false;
+    for (auto &p : pads) {
+        bool open = false;
+        for (auto &o : g_split_di) if (same_path(p.path, o.path)) open = true;
+        if (!open) missing = true;
+    }
+    static DWORD retry = 0;
+    if (missing && (int)(GetTickCount() - retry) >= 0 && (g_di || !list_devices().empty())) {
+        retry = GetTickCount() + 3000;   // a pad DirectInput can't open is looked for again in 3 s
+        for (auto &d : list_devices()) {
+            IDirectInputDevice8W *dev = NULL;
+            if (FAILED(g_di->CreateDevice(d.guid, &dev, NULL))) continue;
+            DIPROPGUIDANDPATH gp = {};
+            gp.diph.dwSize = sizeof(gp); gp.diph.dwHeaderSize = sizeof(DIPROPHEADER); gp.diph.dwHow = DIPH_DEVICE;
+            std::string path;
+            if (SUCCEEDED(dev->GetProperty(DIPROP_GUIDANDPATH, &gp.diph))) path = narrow(gp.wszPath);
+            bool wanted = false, open = false;
+            for (auto &p : pads) if (!path.empty() && same_path(p.path, path)) wanted = true;
+            for (auto &o : g_split_di) if (same_path(o.path, path)) open = true;
+            if (!wanted || open || FAILED(dev->SetDataFormat(&c_dfDIJoystick2))) { dev->Release(); continue; }
+            if (FAILED(dev->SetCooperativeLevel(g_hwnd, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE)))
+                dev->SetCooperativeLevel(NULL, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+            dev->Acquire();
+            g_split_di.push_back({ path, dev });
+        }
+    }
+    for (size_t i = 0; i < pads.size(); i++) {
+        for (auto &o : g_split_di) {
+            if (!same_path(pads[i].path, o.path)) continue;
+            DIJOYSTATE2 st;
+            if (FAILED(o.dev->Poll())) o.dev->Acquire();
+            if (FAILED(o.dev->GetDeviceState(sizeof(st), &st))) break;
+            for (int b = 0; b < 32 && !pressed[i]; b++) if (st.rgbButtons[b] & 0x80) pressed[i] = true;
+            if (LOWORD(st.rgdwPOV[0]) != 0xFFFF) pressed[i] = true;
+            break;
+        }
+    }
+    return pressed;
+}
+static void split_pads_close() {
+    std::lock_guard<std::mutex> l(g_split_di_mx);
+    for (auto &o : g_split_di) { o.dev->Unacquire(); o.dev->Release(); }
+    g_split_di.clear();
+}
+
+// ---- controllers for the player list: XInput slots and DirectInput pads (with a live "pressed" flag) ------
+// A DirectInput pad is "hid:<Raw Input device name>"; "di:<product name>" is the old (1.2.0) form.
 static json split_pads() {
     json x = json::array();
     auto get = xinput_get();
@@ -105,8 +223,30 @@ static json split_pads() {
         x.push_back({ {"slot", (int)i}, {"connected", c}, {"pressed", pressed} });
     }
     json d = json::array();
-    for (auto &dev : list_devices()) if (!pad_is_xinput(dev.name)) d.push_back(dev.name);
+    auto pads = hid_pads();
+    auto pressed = hid_pads_pressed(pads);
+    for (size_t i = 0; i < pads.size(); i++) {
+        int same = 0, nth = 0;
+        for (size_t k = 0; k < pads.size(); k++) if (pads[k].name == pads[i].name) { same++; if (k <= i) nth++; }
+        std::string label = same > 1 ? pads[i].name + " #" + std::to_string(nth) : pads[i].name;
+        d.push_back({ {"id", "hid:" + pads[i].path}, {"name", pads[i].name}, {"label", label}, {"pressed", (bool)pressed[i]} });
+    }
     return { {"xinput", x}, {"devices", d} };
+}
+
+// A player's DirectInput choice as a device path ("" + error when it can't be resolved). The old "di:<name>"
+// form works while exactly one connected pad has that name.
+static std::string split_pad_path(const std::string &input, const std::vector<HidPadInfo> &pads, std::string &err) {
+    if (input.rfind("hid:", 0) == 0) {
+        std::string p = input.substr(4);
+        for (auto &x : pads) if (same_path(x.path, p)) return x.path;
+        err = "its controller is not connected"; return "";
+    }
+    std::string name = input.substr(3), found; int n = 0;
+    for (auto &x : pads) if (x.name == name) { found = x.path; n++; }
+    if (n == 1) return found;
+    err = n ? "there are " + std::to_string(n) + " controllers called " + name + ": choose which one" : "its controller is not connected";
+    return "";
 }
 
 // ---- network: the adapter's address and free addresses next to it -----------------------------------------
@@ -489,6 +629,8 @@ static std::string split_players(const json &state, int count, std::vector<Split
     const json &sp = state["split"];
     if (!sp.contains("p") || !sp["p"].is_array() || (int)sp["p"].size() < count) return "No player settings";
     int keyboards = 0; bool slot_used[4] = {};
+    std::vector<HidPadInfo> pads;
+    bool pads_read = false;
     for (int n = 1; n <= count; n++) {
         const json &p = sp["p"].at(n - 1);
         SplitPlayer x = { js(p, "input"), trim(js(p, "chipId")), trim(js(p, "accessCode")), trim(js(p, "serial")), std::max(0, ji(p, "monitor", 0)) };
@@ -499,7 +641,13 @@ static std::string split_players(const json &state, int count, std::vector<Split
             if (s < 0 || s > 3) return (who + ": choose a controller");
             if (slot_used[s]) return ("Two players have controller " + std::to_string(s + 1));
             slot_used[s] = true;
-        } else if (x.input.rfind("di:", 0) != 0 || x.input.size() < 4) return (who + ": choose a controller or the keyboard");
+        } else if ((x.input.rfind("di:", 0) == 0 || x.input.rfind("hid:", 0) == 0) && x.input.size() > 4) {
+            if (!pads_read) { pads = hid_pads(); pads_read = true; }
+            std::string err;
+            x.pad_path = split_pad_path(x.input, pads, err);
+            if (x.pad_path.empty()) return (who + ": " + err);
+            for (auto &o : pl) if (!o.pad_path.empty() && same_path(o.pad_path, x.pad_path)) return (who + " has the same controller as another player");
+        } else return (who + ": choose a controller or the keyboard");
         if (x.chip.empty()) return (who + ": enter a card (chip ID)");
         if (x.serial.empty()) x.serial = n == 1 ? js(state["cfg"], "serial") : random_serial();
         for (auto &o : pl) if (o.chip == x.chip) return ("Each player needs their own card (" + who + " has the same chip ID as another player)");
@@ -507,6 +655,41 @@ static std::string split_players(const json &state, int count, std::vector<Split
     }
     if (keyboards > 1) return "Only one player can use the keyboard";
     return "";
+}
+
+// The loader refuses to start when [config] has both InterfaceName and IpAddress, and it reads every [config]
+// section of the file as one (inih). WritePrivateProfileString only removes the first copy of a key, and with a
+// UTF-8 BOM it doesn't see the first [config] at all (it appends a new one), so a copied config.ini could keep
+// the game folder's InterfaceName next to the player's IpAddress. This removes the BOM and every InterfaceName /
+// IpAddress line of every [config] section, as text.
+static void split_clean_net_keys(const std::wstring &file) {
+    FILE *f = _wfopen(file.c_str(), L"rb");
+    if (!f) return;
+    std::string text; char buf[4096]; size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) text.append(buf, n);
+    fclose(f);
+    if (text.size() >= 3 && (unsigned char)text[0] == 0xEF && (unsigned char)text[1] == 0xBB && (unsigned char)text[2] == 0xBF) text.erase(0, 3);
+    std::string out;
+    bool in_config = false;
+    for (size_t pos = 0; pos < text.size();) {
+        size_t end = text.find('\n', pos);
+        size_t next = end == std::string::npos ? text.size() : end + 1;
+        std::string line = text.substr(pos, next - pos);
+        pos = next;
+        std::string low = trim(line);
+        for (auto &ch : low) ch = (char)tolower((unsigned char)ch);
+        if (!low.empty() && low[0] == '[') in_config = low.compare(0, 8, "[config]") == 0;
+        else if (in_config && !low.empty() && low[0] != ';' && low[0] != '#') {
+            size_t eq = low.find('=');
+            std::string key = eq == std::string::npos ? "" : trim(low.substr(0, eq));
+            if (key == "interfacename" || key == "ipaddress") continue;
+        }
+        out += line;
+    }
+    if (out == text) return;
+    if ((f = _wfopen(file.c_str(), L"wb")) == NULL) return;
+    fwrite(out.data(), 1, out.size(), f);
+    fclose(f);
 }
 
 // Each player's folder: config.ini (a copy of the game folder's, with this player's address, serial, controller and
@@ -521,11 +704,11 @@ static void split_write_players(const json &state, const std::vector<SplitPlayer
         CreateDirectoryW(d.c_str(), NULL);
         CreateDirectoryW((d + L"\\29").c_str(), NULL);
         CopyFileW(path_of(L"config.ini").c_str(), (d + L"\\config.ini").c_str(), FALSE);
+        split_clean_net_keys(d + L"\\config.ini");   // only this player's IpAddress (below) is left
         Ini c((L"Splitscreen\\P" + std::to_wstring(n) + L"\\config.ini").c_str());
         c.set("config", "mode", "Client");
         c.set("config", "serial", x.serial);
         c.set("config", "IpAddress", ips[n - 1]);
-        c.del("config", "InterfaceName");
         c.set("config", "Windowed", "True");
         c.set("config", "BorderlessWindow", "False");
         c.set("config", "UseRealCardReader", "False");
@@ -536,9 +719,13 @@ static void split_write_players(const json &state, const std::vector<SplitPlayer
             slot = atoi(x.input.c_str() + 7);
             c.set("controller", "Enabled", "True");
             c.set("controller", "Mode", "xinput-native");
-        } else if (x.input.rfind("di:", 0) == 0) {
+        } else if (!x.pad_path.empty()) {
+            // only this device: by its path (two pads of the same model have the same Name, and the loader takes a
+            // device when Path, Name or DeviceId matches)
             c.set("controller", "Enabled", "True");
-            c.set("controller", "Name", x.input.substr(3));
+            c.set("controller", "Path", x.pad_path);
+            c.del("controller", "Name");
+            c.set("controller", "DeviceId", "16");
             c.del("controller", "Mode");
             if (pads.is_array() && !pads.empty()) write_buttons(c, "controller", pads[0], true);   // Controller 1's mapping
         } else {
@@ -567,6 +754,11 @@ static void split_session_end(HANDLE helper_pipe) {
         CloseHandle(helper_pipe);
     }
     backdrop_hide();
+    if (g_split_lm_ours.exchange(false)) {   // a Live Monitor that was already running is left open
+        kill_procs(LM_EXE, true);
+        if (!lm_is_default()) kill_at(lm_path());
+        log_line("splitscreen: Live Monitor closed");
+    }
     Ini me(L"EXVSLauncher.ini");
     me.set("Splitscreen", "PendingIps", ""); me.set("Splitscreen", "PendingInterface", ""); me.set("Splitscreen", "PendingConverted", "False");
     { std::lock_guard<std::mutex> l(g_split_mx); g_split_pids.clear(); g_split_ips.clear(); }
@@ -593,6 +785,7 @@ static json do_split(json state) {
     std::vector<SplitPlayer> pl;
     std::string perr = split_players(state, count, pl);
     if (!perr.empty()) return split_fail(perr);
+    split_pads_close();   // the page's DirectInput handles: the copies read the pads now
 
     Ini me(L"EXVSLauncher.ini");
     std::vector<std::string> left = me.get("Splitscreen", "PendingInterface") == iface ? split_csv(me.get("Splitscreen", "PendingIps")) : std::vector<std::string>();
@@ -620,7 +813,7 @@ static json do_split(json state) {
     set_busy("Writing the players' settings…");
     split_write_players(state, pl, ips, res);
     // the Live Monitor on this PC listens on the same adapter
-    if (exists(path_of(L"lmnfig.ini"))) { Ini lm(L"lmnfig.ini"); lm.set("config", "InterfaceName", iface); lm.del("config", "IpAddress"); }
+    if (exists(path_of(L"lmnfig.ini"))) { split_clean_net_keys(path_of(L"lmnfig.ini")); Ini lm(L"lmnfig.ini"); lm.set("config", "InterfaceName", iface); }
 
     if (jb(state["app"], "autoServer", false) && !server_running()) {
         set_busy("Starting the card server…");
@@ -635,6 +828,7 @@ static json do_split(json state) {
         DWORD_PTR et = SHGetFileInfoW(lm.c_str(), 0, NULL, 0, SHGFI_EXETYPE);
         bool console = et && HIWORD(et) == 0;
         if (!start_process(lm, L"", g_dir.substr(0, g_dir.size() - 1), console ? CREATE_NEW_CONSOLE : 0)) { split_session_end(helper); return split_fail("Could not start the Live Monitor (see EXVSLauncher.log)"); }
+        g_split_lm_ours = true;
         Sleep(2500);
     }
 
