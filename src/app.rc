@@ -1,4 +1,10 @@
-// Resources: manifest, icon and the embedded EXVS Overlay DLL (Settings > In-game overlay > Install).
+// Resources: manifest, icon, the embedded EXVS Overlay DLL (Settings > In-game overlay > Install) and the
+// Custom Training files (written to <game>\Training\ when Custom Training is turned on).
 1 24 "app.manifest"
 APPICON ICON "../build/gen/app.ico"
 OVERLAY_DLL RCDATA "../build/gen/xinput9_1_0.dll"
+TRAINING_BRIDGE RCDATA "../third_party/training2v2/training_bridge.dll"
+TRAINING_ENTRY RCDATA "../third_party/training2v2/training-entry.ini"
+TRAINING_LICENSE RCDATA "../third_party/training2v2/LICENSE-TrainingExtension.txt"
+TRAINING_MINHOOK RCDATA "../third_party/training2v2/MinHook-LICENSE.txt"
+TRAINING_README RCDATA "../third_party/training2v2/README.txt"

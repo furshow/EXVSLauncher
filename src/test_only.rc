@@ -1,1 +1,6 @@
 OVERLAY_DLL RCDATA "../../EXVSOverlay/build/xinput9_1_0.dll"
+TRAINING_BRIDGE RCDATA "../third_party/training2v2/training_bridge.dll"
+TRAINING_ENTRY RCDATA "../third_party/training2v2/training-entry.ini"
+TRAINING_LICENSE RCDATA "../third_party/training2v2/LICENSE-TrainingExtension.txt"
+TRAINING_MINHOOK RCDATA "../third_party/training2v2/MinHook-LICENSE.txt"
+TRAINING_README RCDATA "../third_party/training2v2/README.txt"

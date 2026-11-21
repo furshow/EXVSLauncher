@@ -34,7 +34,7 @@
 #include "overlay_version.h"   // OVERLAY_BUNDLED_VERSION, generated from ../EXVSOverlay/src/menu.h
 
 using json = nlohmann::json;
-static const char *VERSION = "1.2.1";
+static const char *VERSION = "1.3.0";
 
 // ---------------------------------------------------------------------------------------------
 // strings / paths
@@ -328,6 +328,7 @@ static const char *overlay_status() {
 }
 
 static json split_get_state(const json &cfg);   // split.h
+static json training_get_state();                // training.h
 static void split_save_state(const json &sp);
 static json get_state() {
     Ini sl(L"SnowLauncher.ini"), cfg(L"config.ini"), card(L"card.ini"), me(L"EXVSLauncher.ini");
@@ -366,6 +367,7 @@ static json get_state() {
     };
     s["cfg"] = c;
     s["split"] = split_get_state(c);
+    s["training"] = training_get_state();
 
     json kb = json::object();
     const char *kb_secs[][2] = { {"client", "Game_Client_Keyboard"}, {"lm", "Game_LM_Keyboard"} };
@@ -775,13 +777,16 @@ static json do_play(const std::string &mode, json state) {
     return { {"ok", true} };
 }
 
-static void stop_game() {
-    kill_procs(CLIENT_EXE, true);
-    kill_procs(LM_EXE, true);
-    if (!lm_is_default()) kill_at(lm_path());
-    kill_procs(L"run_iboost_CLIENT_mode_v4.exe", true);
-    kill_procs(L"run_iboost_LM_mode_v4.exe", true);
-    log_line("game closed from the launcher");
+// mode "client" / "lm" closes only that part (the Play button closes what the selected mode runs); "" = everything
+static void stop_game(const std::string &mode = "") {
+    bool client = mode != "lm", lm = mode != "client";
+    if (client) { kill_procs(CLIENT_EXE, true); kill_procs(L"run_iboost_CLIENT_mode_v4.exe", true); }
+    if (lm) {
+        kill_procs(LM_EXE, true);
+        if (!lm_is_default()) kill_at(lm_path());
+        kill_procs(L"run_iboost_LM_mode_v4.exe", true);
+    }
+    log_line("%s closed from the launcher", client && lm ? "game" : client ? "client" : "Live Monitor");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1168,6 +1173,8 @@ static json pad_state_di(const std::string &name) {
 }
 
 #include "split.h"   // splitscreen (2-4 copies of the game on this PC)
+#include "training.h"   // Custom Training (custom VS Training matches, run by the overlay)
+#include "cardserver.h"   // card server status chip (local or remote)
 
 // ---------------------------------------------------------------------------------------------
 // Overlay (embedded EXVS Overlay DLL) and background picture
@@ -1493,6 +1500,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     if (argc >= 4 && wcscmp(argv[1], L"--n2n-test") == 0) return n2n_test(argv[2], argv[3]);
     if (argc >= 5 && wcscmp(argv[1], L"--split-helper") == 0) return split_helper(argv[2], argv[3], wcstoul(argv[4], NULL, 10));
     if (argc >= 4 && wcscmp(argv[1], L"--split-selftest") == 0) return split_selftest(argv[2], argv[3]);
+    if (argc >= 4 && wcscmp(argv[1], L"--training-test") == 0) return training_selftest(argv[2], argv[3]);
+    if (argc >= 4 && wcscmp(argv[1], L"--card-test") == 0) return card_selftest(argv[2], argv[3]);
     if (argc >= 4 && wcscmp(argv[1], L"--split-helper-test") == 0) {
         // --split-helper-test <game dir> <out.json>: the network helper without the UAC prompt (unelevated, so Windows
         // refuses the change): checks the pipe, the PowerShell scripts and the error path. Changes nothing.
@@ -1601,7 +1610,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
         w.bind("getState", [&](const std::string &) { last_state = get_state(); return last_state.dump(); });
         w.bind("saveState", [&](const std::string &req) {
             json s = arg0(req);
-            try { save_state(s); last_state = s; return json({ {"ok", true} }).dump(); }
+            try { save_state(s); last_state = s; card_check_now(); return json({ {"ok", true} }).dump(); }
             catch (const std::exception &e) { return json({ {"ok", false}, {"error", e.what()} }).dump(); }
         });
         w.bind("getStatus", [&](const std::string &req) {
@@ -1613,6 +1622,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
                         {"server", server_running()}, {"busy", g_busy}, {"update", update_progress()}, {"log", log}, {"logTotal", g_log.size()},
                         {"n2n", { {"running", (bool)g_n2n_running}, {"connected", (bool)g_n2n_connected}, {"ip", g_n2n_ip} }} };
             st["split"] = split_status();
+            st["training"] = training_status();
+            st["card"] = card_status();
             return st.dump();
         });
         async("play", [&](json a) {
@@ -1622,7 +1633,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
                 std::thread([&w] { Sleep(3000); w.dispatch([&w] { w.terminate(); }); }).detach();
             return r;
         });
-        async("stopGame", [](json) { stop_game(); return json({ {"ok", true} }); });
+        async("stopGame", [](json a) {
+            std::string mode = a.is_array() && !a.empty() && a[0].is_string() ? a[0].get<std::string>() : "";
+            stop_game(mode == "both" ? "" : mode);
+            return json({ {"ok", true} });
+        });
         async("splitStart", [&](json) { return do_split(last_state); });
         async("splitStop", [](json) { split_stop(); return json({ {"ok", true} }); });
         async("splitCleanup", [](json) { return split_cleanup(); });
@@ -1661,7 +1676,23 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
             std::thread([&w] { Sleep(700); w.dispatch([&w] { w.terminate(); }); }).detach();
             return r;
         });
+        async("trainingApply", [&](json a) {
+            json r = training_apply(a.is_array() && !a.empty() ? a[0] : json());
+            if (r.value("ok", false)) last_state["training"] = training_get_state();
+            return r;
+        });
+        w.bind("trainingAccept", [](const std::string &) {
+            Ini(L"EXVSLauncher.ini").set("Training", "LicenseAccepted", TRAINING_LICENSE_ID);
+            return std::string("{\"ok\":true}");
+        });
+        w.bind("trainingLicense", [](const std::string &) {   // the license text (Chinese, as published)
+            HRSRC r = FindResourceW(NULL, L"TRAINING_LICENSE", MAKEINTRESOURCEW(10));
+            std::string text = r ? std::string((const char *)LockResource(LoadResource(NULL, r)), SizeofResource(NULL, r)) : "";
+            if (text.size() >= 3 && (unsigned char)text[0] == 0xEF) text = text.substr(3);
+            return json({ {"text", text} }).dump();
+        });
         async("installOverlay", [](json) { return install_overlay(); });
+        async("openCardServer", [](json) { return open_card_server(); });
         async("removeOverlay", [](json) { return remove_overlay(); });
         w.bind("pickBackground", [](const std::string &) { return pick_background().dump(); });
         w.bind("resetBackground", [](const std::string &) { Ini(L"SnowLauncher.ini").set("AppSettings", "ImagePath", ""); return std::string("{}"); });
@@ -1682,6 +1713,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
         });
         w.bind("openFolder",[](const std::string &) { ShellExecuteW(NULL, L"open", g_dir.c_str(), NULL, NULL, SW_SHOWNORMAL); return std::string("{}"); });
 
+        card_start();
         w.set_html(UI_HTML);
         w.run();
     } catch (const std::exception &e) {

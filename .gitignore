@@ -40,3 +40,7 @@ token*.txt
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Custom Training: aerial's 2v2 Training Extension files shipped unmodified (embedded in the exe)
+!third_party/training2v2/*.dll
+!third_party/training2v2/*.ini
