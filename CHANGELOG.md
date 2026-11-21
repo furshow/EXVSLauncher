@@ -3,7 +3,8 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
-## [Unreleased]
+## [1.3.1] - 2026-11-21
+- Bundles **EXVS Overlay 1.2.1** (Custom Training layouts up to 4 units, result screen and rematch in every layout).
 ### Custom Training
 - **Teams of your choice, up to 4 units**: 1v1, 1v2, 2v1, 1v3, 2v2 or 3v1. Each team has a **＋ Add CPU** button
   (while there's room), every CPU card a **✕** to take it out of the match, and any CPU card can be **dragged to
