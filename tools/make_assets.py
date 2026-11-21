@@ -21,6 +21,9 @@ html = html.replace("<!--LOGO-->", logo.svg())
 i18n = open(os.path.join(root, "ui", "i18n.js"), encoding="utf-8").read()
 assert "</script" not in i18n
 html = html.replace('<script src="i18n.js"></script>', "<script>\n" + i18n + "\n</script>")
+units = open(os.path.join(root, "ui", "training_units.js"), encoding="utf-8").read()   # tools/make_training_units.py
+assert "</script" not in units
+html = html.replace('<script src="training_units.js"></script>', "<script>\n" + units + "\n</script>")
 open(os.path.join(gen, "ui.html"), "w", encoding="utf-8", newline="\n").write(html)
 
 DELIM = "EXVSUI"

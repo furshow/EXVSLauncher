@@ -3,6 +3,29 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
+## [Unreleased]
+### Play button
+- The Play button turns into **Close** only when what the selected mode starts is running: with the Client open,
+  choosing **Live Monitor** shows Play again (to start only the Live Monitor). Close closes only that part
+  (Client, Live Monitor, or both for Client + LM); Settings › Force close still closes everything.
+### Card server chip
+- The Play page chip now shows the card server of your settings, local or remote: **Card server online / offline**
+  (or Local server on / off). The launcher checks it every 10 seconds (any HTTP answer = online). When it's
+  online, clicking the chip opens its page in the browser (the Server-Infinite web panel for a local server).
+### Custom Training
+- New **Custom Training** page (**Custom** in the menu): VS Training as a 2v2. Pick your unit (or the one picked in game), a partner and two enemies
+  from a picker with pictures, cost tabs and search (249 units, 13 bosses, Eldora Dotress), or **Random** for a
+  new unit every match, or random by category: **Random 3000 / 2500 / 2000 / 1500** and **Random boss**. CPU behavior (stand still, easy … extreme, walk, evade, jumps) and EX type per slot (or
+  **Random**: a new F / S / E every match), random stage, and team cost (COST OVER ends the match).
+  Changes apply to the next VS Training match, with the game open; turning it off brings the normal 1v1 back.
+- The partner card has **Ally / Off / Enemy**: Off = **1v2** (you against the two enemies), Enemy = **1v3** (the card
+  moves to the enemy team as Enemy 3). The card can also be dragged to the other team. Random stage works in all
+  three; team cost works in 2v2 and (experimental) in 1v3 and 1v2.
+- It runs on the bridge of aerial's free, non-commercial "2v2 Training Extension" 1.1 (QQ group 1132405231),
+  embedded unmodified and written to `Training\` with its license the first time it's turned on, after accepting
+  the license. The EXVS Overlay 1.2.0 or newer loads it inside the game; it accepts any 1.13.30 client (build
+  check instead of exact exe hashes). Not an official aerial release: see `Training\README.txt`.
+
 ## [1.2.1] - 2026-11-19
 ### Fixed
 - Splitscreen: with two DirectInput controllers of the same model (e.g. two DualSense), every copy read both.

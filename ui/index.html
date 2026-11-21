@@ -109,11 +109,14 @@ select option { background: #0b0f19; }
   linear-gradient(rgba(90,130,210,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(90,130,210,0.07) 1px, transparent 1px);
   background-size: auto, auto, 38px 38px, 38px 38px; }
 .play-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 44px 40px; }
-.status-bar { position: absolute; top: 22px; right: 26px; display: flex; gap: 8px; }
+.status-bar { position: absolute; top: 22px; right: 26px; display: flex; gap: 8px; z-index: 2; }   /* above .play-wrap (full page): the card server chip is clickable */
 .chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 20px; background: rgba(10,14,24,0.72); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); backdrop-filter: blur(8px); }
 .chip i { width: 8px; height: 8px; border-radius: 50%; background: #48526a; }
 .chip.on { color: var(--text); } .chip.on i { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .chip.warn i { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.chip.bad i { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.chip.link.on { cursor: pointer; transition: border-color .15s, background .15s; }
+.chip.link.on:hover { border-color: var(--accent); background: rgba(47,140,255,0.14); }
 .eyebrow { font: 600 12px var(--head); letter-spacing: 3px; text-transform: uppercase; color: var(--accent-hi); }
 .title { font: 700 46px/1.02 var(--head); letter-spacing: 0.5px; margin: 8px 0 6px; text-shadow: 0 4px 30px rgba(0,0,0,0.6); }
 .title span { color: var(--red); }
@@ -293,6 +296,72 @@ body.pad .pad-hint { display: block; }
 .sp-warn[hidden] { display: none; }
 .sp-warn .btn { margin-left: auto; }
 @media (max-width: 980px) { .sp-top { grid-template-columns: 1fr; } }
+
+/* ---------- custom training ---------- */
+.tr-bar { display: flex; flex-wrap: wrap; gap: 14px 30px; align-items: center; padding: 14px 18px; margin-bottom: 16px; }
+.tr-bar > div { display: flex; gap: 12px; align-items: center; }
+.tr-bar .tt { font: 600 14.5px var(--head); letter-spacing: .3px; }
+.tr-bar .ds { color: var(--dim); font-size: 12px; }
+.tr-sw { flex: 1 1 260px; }
+.tr-sw .ds.ok { color: var(--green); } .tr-sw .ds.bad { color: var(--amber); } .tr-sw .ds.err { color: #ff8a99; }
+.tr-field { display: grid; grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr); gap: 14px; align-items: start; }
+.tr-field .tr-vs { align-self: center; }
+.tr-team { display: grid; gap: 12px; }
+.tr-team h3 { margin: 0 0 -2px 2px; font: 600 11.5px var(--head); letter-spacing: 2.2px; text-transform: uppercase; color: var(--tc); }
+.tr-vs { text-align: center; font: italic 700 30px var(--head); letter-spacing: 1px; color: #fff; text-shadow: 0 0 16px var(--accent-glow), 0 0 26px rgba(255,61,85,0.45); }
+.tr-slot { position: relative; display: grid; grid-template-columns: 171px minmax(0, 1fr); gap: 14px; padding: 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); transition: border-color .15s; }
+.tr-slot::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tc); box-shadow: 0 0 10px var(--tc); }
+.tr-slot:hover { border-color: var(--line-strong); }
+.tr-unit { position: relative; width: 171px; height: 78px; padding: 0; border-radius: 9px; overflow: hidden; cursor: pointer; border: 1px solid var(--line-strong); background: #0b0f19 center / cover no-repeat; transition: .15s; }
+.tr-unit:hover, .tr-unit.gp { border-color: var(--accent); box-shadow: 0 0 14px rgba(47,140,255,0.35); }
+.tr-unit .sym { position: absolute; inset: 0; display: grid; place-items: center; font: 700 30px var(--head); color: var(--muted); background: repeating-linear-gradient(135deg, #0d1322 0 10px, #0b101c 10px 20px); }
+.tr-unit .edit { position: absolute; right: 5px; top: 5px; font-size: 10px; padding: 1px 6px; border-radius: 6px; background: rgba(0,0,0,0.6); color: #cfe0ff; opacity: 0; transition: .15s; }
+.tr-unit:hover .edit, .tr-unit.gp .edit { opacity: 1; }
+.tr-meta { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tr-meta .who { font: 600 11px var(--head); letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+.tr-meta .nm { font: 600 15px var(--head); letter-spacing: .3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr-meta .nm small { color: var(--dim); font: 500 12px var(--head); margin-left: 6px; }
+.tr-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tr-meta .who { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tr-psw { display: inline-flex; align-items: center; gap: 7px; font: 600 10.5px var(--head); letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; }
+.tr-psw .seg { padding: 2px; border-radius: 7px; }
+.tr-psw .seg button { padding: 2px 8px; font: 600 10.5px var(--head); letter-spacing: .8px; text-transform: uppercase; border-radius: 5px; }
+.tr-psw .seg button.on.en { background: var(--red); }
+.tr-slot.off .tr-unit, .tr-slot.off .nm, .tr-slot.off .tr-two { opacity: .32; pointer-events: none; filter: grayscale(1); }
+.tr-slot.off::before { background: var(--dim); box-shadow: none; }
+.tr-bar .tr-opt.na { opacity: .4; }
+.tr-slot[draggable="true"] { cursor: grab; }
+.tr-slot.dragging { opacity: .45; }
+.tr-team.drop { outline: 2px dashed var(--accent); outline-offset: 6px; border-radius: 14px; }
+.tr-team.drop.en { outline-color: var(--red); }
+.tr-drag-hint { font: 500 10.5px var(--head); letter-spacing: .6px; color: var(--dim); text-transform: none; margin-left: 6px; }
+.tr-two select { width: 100%; min-width: 0; padding: 6px 8px; }
+.tr-two .fl { margin-bottom: 3px; font-size: 10px; }
+.tr-note { color: var(--muted); font-size: 12.5px; margin: 16px 0 0; }
+.tr-credit { color: var(--dim); font-size: 11.5px; margin: 6px 0 0; }
+.tr-credit b { color: var(--muted); font-weight: 600; }
+.tr-lic { display: flex; gap: 14px; align-items: center; padding: 14px 16px; margin-bottom: 16px; border-radius: 12px; border: 1px solid rgba(255,181,71,0.4); background: linear-gradient(135deg, rgba(255,181,71,0.12), rgba(16,20,32,0.6) 70%); }
+.tr-lic[hidden] { display: none; }
+.tr-lic-ic { flex: 0 0 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 18px var(--head); color: #1a1205; background: var(--amber); box-shadow: 0 0 12px rgba(255,181,71,0.5); }
+.tr-lic-txt { flex: 1; min-width: 0; } .tr-lic-txt b { display: block; font: 600 14.5px var(--head); margin-bottom: 2px; } .tr-lic-txt span { color: #d9c7a6; font-size: 12.5px; }
+.tr-lic-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.tr-lic-text { text-align: left; white-space: pre-wrap; font: 12.5px/1.6 "Microsoft YaHei UI", "Segoe UI", sans-serif; color: #c3cde0; background: #0a0e18; border: 1px solid var(--line); border-radius: 10px; padding: 14px; max-height: 52vh; overflow-y: auto; }
+.tr-pick-box { width: min(900px, 94vw); height: min(680px, 88vh); display: flex; flex-direction: column; text-align: left; padding: 18px 20px; }
+.tr-pick-head { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+.tr-pick-head .tt { flex: 1; font: 600 18px var(--head); letter-spacing: .4px; }
+.tr-pick-head input { min-width: 220px; }
+.cr-box .tr-pick-head .btn { margin: 0; min-width: 0; }
+#tr-costs { margin: 0 0 12px; }
+.tr-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; grid-auto-rows: max-content; align-content: start; padding: 2px; }
+.tr-grid button { padding: 0; border: 1px solid var(--line); border-radius: 9px; background: #0b0f19; overflow: hidden; cursor: pointer; text-align: left; transition: .12s; }
+.tr-grid button:hover, .tr-grid button.gp { border-color: var(--accent); box-shadow: 0 0 12px rgba(47,140,255,0.35); }
+.tr-grid button.on { border-color: var(--accent); background: rgba(47,140,255,0.16); }
+.tr-grid .im { display: block; width: 100%; aspect-ratio: 171 / 78; background: #0d1322 center / cover no-repeat; }
+.tr-grid .im.sym { display: grid; place-items: center; font: 700 26px var(--head); color: var(--muted); background: repeating-linear-gradient(135deg, #0d1322 0 10px, #0b101c 10px 20px); }
+.tr-grid .lb { padding: 4px 8px 5px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr-grid .lb small { color: var(--dim); margin-left: 4px; }
+.tr-grid .none { grid-column: 1 / -1; color: var(--dim); text-align: center; padding: 30px; }
+@media (max-width: 1100px) { .tr-field { grid-template-columns: 1fr; } .tr-vs { padding: 2px 0; } }
 </style>
 </head>
 <body>
@@ -301,6 +370,7 @@ body.pad .pad-hint { display: block; }
     <div class="logo" title="EXVS Launcher"><!--LOGO--></div>
     <button data-page="play" class="active" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play</button>
     <button data-page="split" title="Splitscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="8" height="7" rx="1.5"/><rect x="13" y="4" width="8" height="7" rx="1.5"/><rect x="3" y="13" width="8" height="7" rx="1.5"/><rect x="13" y="13" width="8" height="7" rx="1.5"/></svg>Split</button>
+    <button data-page="training" title="Custom Training"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l9 9M4 4h4M4 4v4M20 4l-9 9M20 4h-4M20 4v4"/><path d="M8.5 15.5l-3 3M15.5 15.5l3 3"/><circle cx="5" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/></svg>Custom</button>
     <button data-page="settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Settings</button>
     <button data-page="online" title="Online"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg>Online</button>
     <button data-page="mods" title="Mods"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>Mods</button>
@@ -315,7 +385,7 @@ body.pad .pad-hint { display: block; }
       <div class="status-bar">
         <span class="chip" id="chip-game"><i></i>Game</span>
         <span class="chip" id="chip-n2n"><i></i>N2N</span>
-        <span class="chip" id="chip-server"><i></i>Local server</span>
+        <span class="chip link" id="chip-server"><i></i>Card server</span>
       </div>
       <div class="play-wrap">
         <div class="eyebrow">Mobile Suit Gundam</div>
@@ -376,6 +446,27 @@ body.pad .pad-hint { display: block; }
         <button class="btn primary big" id="sp-start">Start splitscreen</button>
         <span class="busy" id="sp-busy"></span>
       </div>
+    </section>
+
+    <!-- 2v2 TRAINING -->
+    <section class="page" id="page-training">
+      <h1>Custom Training <span class="pill off" id="tr-pill">Off</span></h1>
+      <p class="sub">Turn VS Training into a custom match (2v2, 1v2 or 1v3): pick your unit, a partner and two enemies, with what each CPU does and its EX type.</p>
+      <div class="sp-warn" id="tr-ov" hidden><span id="tr-ov-text"></span><button class="btn primary" id="tr-ov-btn"></button></div>
+      <div class="tr-lic" id="tr-lic" hidden>
+        <div class="tr-lic-ic">!</div>
+        <div class="tr-lic-txt"><b>Free, non-commercial add-on by aerial</b>
+          <span>Custom Training runs on the bridge of aerial's "2v2 Training Extension" 1.1. It's free for non-commercial use under the author's license. Never pay for it: if someone charges you for it, report it in the author's QQ group 1132405231.</span></div>
+        <div class="tr-lic-btns"><button class="btn" id="tr-lic-read">Read the license</button><button class="btn primary" id="tr-lic-ok">I accept</button></div>
+      </div>
+      <div class="card tr-bar">
+        <div class="tr-sw"><label class="switch"><input type="checkbox" id="tr-on"><span></span></label><div><div class="tt">Custom match in VS Training</div><div class="ds" id="tr-status">—</div></div></div>
+        <div class="tr-opt"><label class="switch"><input type="checkbox" id="tr-stage"><span></span></label><div><div class="tt">Random stage</div><div class="ds">A different stage every match</div></div></div>
+        <div class="tr-opt"><label class="switch"><input type="checkbox" id="tr-cost"><span></span></label><div><div class="tt">Team cost</div><div class="ds">Units cost when shot down · COST OVER ends the match</div></div></div>
+      </div>
+      <div class="tr-field" id="tr-field"></div>
+      <p class="tr-note">Changes apply to the next VS Training match you start (the game can stay open). Turn it off to get the normal 1v1 training back.</p>
+      <p class="tr-credit">2v2 bridge: <b>aerial</b> · free non-commercial license · QQ group 1132405231 · loaded by the EXVS Overlay (not an official aerial release)</p>
     </section>
 
     <!-- SETTINGS (game menu style) -->
@@ -476,6 +567,21 @@ body.pad .pad-hint { display: block; }
   </main>
 </div>
 <div class="toast" id="toast"></div>
+<div class="credits" id="tr-pick" style="display:none">
+  <div class="cr-box tr-pick-box">
+    <div class="tr-pick-head"><div class="tt" id="tr-pick-title"></div><input type="text" id="tr-search" placeholder="Search units"><button class="btn" id="tr-pick-close">Close</button></div>
+    <div class="cats" id="tr-costs"></div>
+    <div class="tr-grid" id="tr-grid"></div>
+  </div>
+</div>
+<div class="credits" id="tr-licbox" style="display:none">
+  <div class="cr-box">
+    <div class="cr-title">LICENSE</div>
+    <div class="cr-ver">aerial non-commercial license 1.0 (Chinese, as published by the author)</div>
+    <pre class="tr-lic-text" id="tr-lic-text"></pre>
+    <button class="btn primary" id="tr-licbox-close">Close</button>
+  </div>
+</div>
 <div class="credits" id="upd" style="display:none">
   <div class="cr-box">
     <div class="cr-title" id="upd-title"></div>
@@ -511,6 +617,7 @@ body.pad .pad-hint { display: block; }
 </div>
 
 <script src="i18n.js"></script>
+<script src="training_units.js"></script>
 <script>
 "use strict";
 // ================================================================ languages
@@ -528,7 +635,7 @@ function t(s, vars) {
   return r;
 }
 window.__i18nMissing = lang => [...I18N_SEEN].filter(k => !(window.I18N && I18N[lang] && I18N[lang][k]) && /[A-Za-z]{2}/.test(k));
-const NO_I18N = "script, style, #sp-players, #sp-preview, #sp-mon, #sp-iface, #sp-monitor, #sp-res, #sp-busy, #sp-left-text, #sp-pill, #sp-start, #sp-ov-btn, #opts, #info, #cats, #ctrl-body, #n2n-log, .iface-sel, #q-display, #q-res, #q-card, #q-server, #cr-ver, .cr-name, #ov-text, #up-text, #upd-title, #upd-ver, #upd-notes, #toast, svg";
+const NO_I18N = "script, style, #sp-players, #sp-preview, #sp-mon, #sp-iface, #sp-monitor, #sp-res, #sp-busy, #sp-left-text, #sp-pill, #sp-start, #sp-ov-btn, #opts, #info, #cats, #ctrl-body, #n2n-log, .iface-sel, #q-display, #q-res, #q-card, #q-server, #cr-ver, .cr-name, #ov-text, #up-text, #upd-title, #upd-ver, #upd-notes, #toast, #tr-field, #tr-grid, #tr-costs, #tr-status, #tr-pill, #tr-pick-title, #tr-lic-text, #tr-ov-text, #tr-ov-btn, svg";
 function translateStatic() {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -550,7 +657,7 @@ function setLang(code) {
   LANG = LANGS.some(l => l[0] === code) ? code : "en";
   document.documentElement.lang = LANG;
   translateStatic();
-  if (S) { renderCats(); renderOpts(); renderQuick(); renderOverlayBanner(); renderSplit(); }
+  if (S) { renderCats(); renderOpts(); renderQuick(); renderOverlayBanner(); renderSplit(); renderTraining(); }
 }
 
 // ================================================================ backend bridge
@@ -575,8 +682,10 @@ const mock = {
       p: [{ input: "xinput:0", chipId: "Player1", accessCode: "0000", serial: "XXXX", monitor: 0 }, { input: "xinput:1", chipId: "Player1_P2", accessCode: "0000", serial: "k3Zp", monitor: 0 },
           { input: "keyboard", chipId: "Player1_P3", accessCode: "0000", serial: "Q7mw", monitor: 1 }, { input: "xinput:3", chipId: "Player1_P4", accessCode: "0000", serial: "fa2D", monitor: 1 }],
       pending: { ips: "", iface: "", converted: false } },
+    training: { licenseAccepted: false, installed: false, enabled: false, randomStage: false, consumeCost: true, partner: 1, overlayMin: "1.2.0",
+      slots: [{ unit: 0, level: 0, ex: -1 }, { unit: 1001001, level: 2, ex: 0 }, { unit: -1, level: 3, ex: 1 }, { unit: 601001001, level: 4, ex: 2 }] },
   },
-  status: { client: false, lm: false, server: false, n2n: { running: false, connected: false, ip: "" }, log: [], busy: "" },
+  status: { client: false, lm: false, server: false, n2n: { running: false, connected: false, ip: "" }, log: [], busy: "", training: { state: "nogame", message: "" }, card: { state: "online", local: false, ms: 84, url: "http://card.example.com/" } },
 };
 async function call(name, ...args) {
   if (HAS_HOST) return window[name](...args);
@@ -587,6 +696,7 @@ async function call(name, ...args) {
       notes: "## What's new\n- **Automatic updates** for the launcher and the overlay.\n- Fixes.\n\nThanks for playing!" };
     case "padState": { const ph = Math.floor(performance.now() / 600) % 8; return { connected: true, buttons: [ph + 1], pov: ph * 45, x: 0, y: 0 }; }
     case "splitPads": { const ph = Math.floor(performance.now() / 900) % 4; return { xinput: [0, 1, 2, 3].map(i => ({ slot: i, connected: i < 2, pressed: i === ph && i < 2 })), devices: [{ id: "hid:mock-dualsense-1", name: "DualSense Wireless Controller", label: "DualSense Wireless Controller #1", pressed: ph === 2 }, { id: "hid:mock-dualsense-2", name: "DualSense Wireless Controller", label: "DualSense Wireless Controller #2", pressed: ph === 3 }] }; }
+    case "trainingLicense": return { text: "Server-Infinite 2v2 训练扩展\naerial 非商业使用许可 v1.0\n(mock)" };
     case "listControllers": return [{ name: "Controller (Xbox One For Windows)", xinput: true }, { name: "Wireless Controller", xinput: false }];
     default: return { ok: true };
   }
@@ -1280,6 +1390,7 @@ $("#upd").onclick = e => { if (e.target.id === "upd") closeUpdateNotes(); };
 window.addEventListener("keydown", e => { if (e.code === "Escape" && updOpen()) closeUpdateNotes(); });
 
 function renderQuick() {
+  if (S && S.app) renderPlayBtn();
   const c = S.cfg.client, m = winMode(c.window);
   $("#q-display").textContent = m === 2 ? t("Window {size}", { size: WIN[c.window] }) : t(WIN[m]);
   $("#q-res").textContent = RES[c.resolution]?.label || "—";
@@ -1289,12 +1400,25 @@ function renderQuick() {
   $("#q-server").className = sv && !S.app.streamer ? "" : "muted";
   for (const b of $$("#mode-seg button")) b.classList.toggle("on", b.dataset.mode === S.app.mode);
 }
-for (const b of $$("#mode-seg button")) b.onclick = () => { S.app.mode = b.dataset.mode; changed(); };
+for (const b of $$("#mode-seg button")) b.onclick = () => { S.app.mode = b.dataset.mode; changed(); renderPlayBtn(); };
 
-let running = false;
+let running = false, lastGameSt = { client: false, lm: false };
+// the Play button turns into Close only when what the selected mode starts is running
+// (Client running + "Live Monitor" selected = Play, to start the Live Monitor too)
+const modeRunning = () => { const m = S && S.app.mode, st = lastGameSt; return m === "lm" ? !!st.lm : m === "both" ? !!(st.client || st.lm) : !!st.client; };
+function renderPlayBtn() {
+  const btn = $("#play-btn"), on = modeRunning();
+  btn.classList.toggle("running", on);
+  btn.querySelector("span").textContent = t(on ? (S.app.mode === "lm" ? "CLOSE LM" : "CLOSE GAME") : "PLAY");
+  btn.querySelector("svg").innerHTML = on ? '<rect x="6" y="6" width="12" height="12" rx="2"/>' : '<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>';
+}
 $("#play-btn").onclick = async () => {
   const btn = $("#play-btn");
-  if (running) { if (confirm(t("Close the game?"))) await call("stopGame"); return; }
+  if (modeRunning()) {
+    const m = S.app.mode;
+    if (confirm(t(m === "lm" ? "Close the Live Monitor?" : m === "both" ? "Close the game?" : "Close the client?"))) await call("stopGame", m);
+    return;
+  }
   if (!S.cfg.chipId) { toast("Set your card name in Settings › Account first", true); showPage("settings"); openCat("account"); return; }
   btn.disabled = true;
   await saveNow();
@@ -1302,24 +1426,41 @@ $("#play-btn").onclick = async () => {
   btn.disabled = false;
   if (r && r.ok === false) toast(r.error || "Could not start the game", true);
 };
+// card server chip: the server of the card settings, local or remote; click = open its page in the browser
+function renderCardChip(c, localRunning) {
+  const el = $("#chip-server"), online = c.state === "online";
+  const label = c.state === "none" ? (localRunning ? "Local server on" : "No card server set")
+    : c.local ? (online ? "Local server on" : c.state === "checking" ? "Local server…" : "Local server off")
+    : online ? "Card server online" : c.state === "checking" ? "Card server…" : "Card server offline";
+  setChip("#chip-server", online || (c.state === "none" && localRunning), label, c.state === "checking");
+  el.classList.add("link");   // setChip resets the classes
+  if (c.state === "offline") el.classList.add("bad");
+  el.title = online ? t("Open the card server page in the browser") + (S && S.app.streamer ? "" : " · " + c.url) + (c.ms ? ` · ${c.ms} ms` : "")
+    : c.state === "offline" ? t("The card server doesn't answer") + (S && S.app.streamer ? "" : " · " + c.url) : "";
+  el.dataset.on = online ? "1" : "";
+}
+$("#chip-server").onclick = async () => {
+  if (!$("#chip-server").dataset.on) return;
+  const r = await call("openCardServer");
+  if (r && r.ok === false) toast(r.error, true);
+};
 function setChip(id, on, label, warn) { const c = $(id); c.className = "chip" + (on ? " on" : "") + (warn ? " warn" : ""); c.lastChild.textContent = t(label); }
 let logShown = 0;
 async function poll() {
   try {
     const st = await call("getStatus", logShown);
     running = st.client || st.lm;
-    const btn = $("#play-btn");
-    btn.classList.toggle("running", running);
-    btn.querySelector("span").textContent = t(running ? "CLOSE GAME" : "PLAY");
-    btn.querySelector("svg").innerHTML = running ? '<rect x="6" y="6" width="12" height="12" rx="2"/>' : '<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>';
+    lastGameSt = { client: !!st.client, lm: !!st.lm };
+    renderPlayBtn();
     setChip("#chip-game", running, st.client && st.lm ? "Client + LM running" : st.client ? "Client running" : st.lm ? "Live Monitor running" : "Game");
     const n = st.n2n || {};
     setChip("#chip-n2n", n.connected, n.connected ? (n.ip ? "N2N " + n.ip : "N2N connected") : n.running ? "N2N connecting…" : "N2N", n.running && !n.connected);
-    setChip("#chip-server", st.server, st.server ? "Local server on" : "Local server");
+    renderCardChip(st.card || {}, st.server);
     $("#tagline").textContent = t(st.busy || (running ? "Good luck out there, pilot." : "Ready to deploy."));
     $("#busy").textContent = t(st.busy || "");
     if (updating && st.update) renderUpdateBanner(st.update);
     spStatus(st);
+    trStatus(st.training);
     $("#mm-status").textContent = /sync/i.test(st.busy || "") ? t(st.busy) : "";
     const np = $("#n2n-pill"); np.textContent = t(n.connected ? "Connected" : n.running ? "Connecting" : "Disconnected"); np.className = "pill" + (n.connected ? "" : " off");
     const sp = $("#server-pill"); sp.textContent = t(st.server ? "Running" : "Stopped"); sp.className = "pill" + (st.server ? "" : " off");
@@ -1503,9 +1644,164 @@ function spStatus(st) {
   } else spRenderButton();
 }
 
+// ================================================================ custom training page
+const TR_UNITS = window.TRAINING_UNITS || [];   // [id, name, cost, group, thumb]
+const TR_BY_ID = new Map(TR_UNITS.map(u => [u[0], u]));
+const TR_POOL = TR_UNITS.filter(u => u[3] === "normal").map(u => u[0]);   // "Random" picks among these
+const TR_SLOTS = [["You", 0], ["Partner", 0], ["Enemy 1", 1], ["Enemy 2", 1]];   // [label, team]
+const TR_EX = ["F · Fighting", "S · Shooting", "E · Extend"];
+const TR_CPU = ["Stand still", "Easy", "Normal", "Hard", "Extreme", "Walk", "Evade", "Low jump", "Mid jump", "High jump"];   // bridge "level" values 0-9
+const TR_COSTS = [["All", null], ["3000", 3000], ["2500", 2500], ["2000", 2000], ["1500", 1500], ["Boss / CPU", "boss"]];
+let trTimer = 0, trPickSlot = -1, trCost = 0, trState = { state: "nogame", message: "" };
+
+const trModal = () => ["#tr-pick", "#tr-licbox"].map(s => $(s)).find(el => el.style.display !== "none") || null;
+function trCloseModals() { $("#tr-pick").style.display = "none"; $("#tr-licbox").style.display = "none"; setGp(null); }
+function cmpVer(a, b) {
+  const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+  return 0;
+}
+
+const TR_CATS = [[-3000, "Random 3000"], [-2500, "Random 2500"], [-2000, "Random 2000"], [-1500, "Random 1500"], [-9, "Random boss"]];
+const trCatPool = id => id === -9 ? TR_UNITS.filter(u => u[3] === "boss").map(u => u[0]) : TR_UNITS.filter(u => u[3] === "normal" && u[2] === -id).map(u => u[0]);
+function trUnitLabel(id, slot) {   // [name, small text, thumbnail ("" = none)]
+  if (id === 0 && slot === 0) return [t("Picked in game"), t("your unit choice"), ""];
+  const cat = TR_CATS.find(c => c[0] === id);
+  if (cat) return [t(cat[1]), t("a new unit every match"), ""];
+  if (id === -1 || !TR_BY_ID.has(id)) return [t("Random"), t("a new unit every match"), ""];
+  const u = TR_BY_ID.get(id);
+  return [u[1], u[3] === "normal" ? String(u[2]) : t(u[3] === "boss" ? "Boss" : "CPU"), u[4]];
+}
+function trSlotHtml(i) {
+  const s = S.training.slots[i];
+  const [name, sub, img] = trUnitLabel(s.unit, i);
+  const level = `<div><label class="fl">${esc(t("CPU behavior"))}</label><select data-tr="level" data-n="${i}">${TR_CPU.map((l, k) => `<option value="${k}"${k === s.level ? " selected" : ""}>${esc(t(l))}</option>`).join("")}</select></div>`;
+  const exOpts = (i === 0 ? [[-1, t("Picked in game")]] : []).concat(TR_EX.map((e, k) => [k, e]), [[3, t("Random")]]);
+  const ex = `<div><label class="fl">EX</label><select data-tr="ex" data-n="${i}">${exOpts.map(([v, l]) => `<option value="${v}"${v === s.ex ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>`;
+  // partner card: Ally (2v2) / Off (1v2) / Enemy (1v3: it becomes the third enemy)
+  const pm = trPartner(), off = i === 1 && pm === 0, enemy = (TR_SLOTS[i][1] === 1) || (i === 1 && pm === 2);
+  const psw = i === 1 ? `<span class="tr-psw"><span class="seg" id="tr-partner">${[[1, "Ally", "2v2"], [0, "Off", "1v2"], [2, "Enemy", "1v3"]].map(([v, l, m]) =>
+    `<button data-pm="${v}" class="${v === pm ? "on" : ""}${v === 2 ? " en" : ""}" title="${esc(m)}">${esc(t(l))}</button>`).join("")}</span></span>` : "";
+  const who = i === 1 && pm === 2 ? "Enemy 3" : TR_SLOTS[i][0];
+  return `<div class="tr-slot${off ? " off" : ""}"${i === 1 && !off ? ` draggable="true" data-partner="1" title="${esc(t("Drag to the other team"))}"` : ""} style="--tc:${enemy ? "var(--red)" : "var(--accent)"}">
+    <button class="tr-unit" data-pick="${i}"${img ? ` style="background-image:url('${img}')"` : ""}>${img ? "" : `<span class="sym">${s.unit === -1 ? "?" : s.unit === -9 ? "B?" : s.unit < -1 ? -s.unit + "?" : "✦"}</span>`}<span class="edit">${esc(t("Change"))}</span></button>
+    <div class="tr-meta"><div class="who"><span>${esc(t(who))}</span>${psw}</div><div class="nm">${esc(name)}${sub ? `<small>${esc(sub)}</small>` : ""}</div><div class="tr-two">${i === 0 ? ex : level + ex}</div></div>
+  </div>`;
+}
+const trPartner = () => { const p = S.training.partner; return p === false ? 0 : p === true || p == null ? 1 : +p; };   // 1 ally, 0 off, 2 enemy
+function renderTraining() {
+  const tr = S && S.training; if (!tr) return;
+  const pm = trPartner();
+  $("#tr-field").innerHTML =
+    `<div class="tr-team" data-side="1" style="--tc:var(--accent-hi)"><h3>${esc(t("Your team"))}</h3>${trSlotHtml(0)}${pm === 2 ? "" : trSlotHtml(1)}</div>
+     <div class="tr-vs">${pm === 1 ? "VS" : pm === 0 ? "1v2" : "1v3"}</div>
+     <div class="tr-team en" data-side="2" style="--tc:#ff7083"><h3>${esc(t("Enemy team"))}</h3>${trSlotHtml(2)}${trSlotHtml(3)}${pm === 2 ? trSlotHtml(1) : ""}</div>`;
+  for (const b of $$("#tr-field [data-pick]")) b.onclick = () => trOpenPicker(+b.dataset.pick);
+  for (const el of $$("#tr-field select[data-tr]")) el.onchange = () => { S.training.slots[+el.dataset.n][el.dataset.tr] = +el.value; trChanged(); };
+  for (const b of $$("#tr-partner button")) b.onclick = () => { S.training.partner = +b.dataset.pm; trChanged(true); };
+  // drag the partner card to the other team: enemy team = 1v3, your team = 2v2
+  const card = $("#tr-field [data-partner]");
+  if (card) {
+    card.addEventListener("dragstart", e => {
+      if (e.target.closest("select, button")) { e.preventDefault(); return; }
+      e.dataTransfer.setData("text/plain", "partner"); e.dataTransfer.effectAllowed = "move";
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", () => { card.classList.remove("dragging"); $$("#tr-field .tr-team").forEach(z => z.classList.remove("drop")); });
+  }
+  for (const zone of $$("#tr-field .tr-team")) {
+    const side = +zone.dataset.side;
+    zone.addEventListener("dragover", e => { if (!card || side === trPartner()) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; zone.classList.add("drop"); });
+    zone.addEventListener("dragleave", e => { if (!zone.contains(e.relatedTarget)) zone.classList.remove("drop"); });
+    zone.addEventListener("drop", e => { e.preventDefault(); zone.classList.remove("drop"); if (side !== trPartner()) { S.training.partner = side; trChanged(true); } });
+  }
+  // team cost in every mode, always on aerial's bridge (1v3 / 1v2: its 2v2 with the partner moved / taken out)
+  $("#tr-cost").closest(".tr-opt").title = pm === 2 ? t("1v3 with team cost runs on aerial's bridge (experimental)") : pm === 0 ? t("1v2 with team cost runs on aerial's bridge (experimental)") : "";
+  $("#tr-on").checked = !!tr.enabled; $("#tr-on").disabled = !tr.licenseAccepted;
+  $("#tr-stage").checked = !!tr.randomStage; $("#tr-cost").checked = tr.consumeCost !== false;
+  $("#tr-lic").hidden = !!tr.licenseAccepted;
+  const ov = S.files.overlayStatus;
+  const old = ov === "missing" || ov === "outdated" || (ov !== "newer" && cmpVer(S.files.overlayVersion || "0", tr.overlayMin) < 0);
+  $("#tr-ov").hidden = !old;
+  $("#tr-ov-text").textContent = t("Custom Training needs the EXVS Overlay {v} or newer: it loads aerial's bridge inside the game.", { v: tr.overlayMin });
+  $("#tr-ov-btn").textContent = t(ov === "missing" ? "Install overlay" : "Update overlay");
+  trRenderStatus();
+}
+function trRenderStatus() {
+  const tr = S.training, st = trState || {}, el = $("#tr-status"), pill = $("#tr-pill");
+  let txt, cls = "";
+  if (!tr.licenseAccepted) txt = t("Accept the license to use it");
+  else if (!tr.enabled) txt = t("Off: VS Training is the normal 1v1");
+  else if (st.state === "nogame") txt = t("On · it starts with the game"), cls = "ok";
+  else if (st.state === "waiting") txt = t("Waiting for the game… (needs the EXVS Overlay)"), cls = "bad";
+  else if (st.state === "applied") txt = t(["Active: VS Training is a 1v2", "Active: VS Training is a 2v2", "Active: VS Training is a 1v3"][trPartner()]), cls = "ok";
+  else if (st.state === "error") txt = t("Error: {m}", { m: st.message || "?" }), cls = "err";
+  else txt = t("On · start a VS Training match"), cls = "ok";
+  el.textContent = txt; el.className = "ds " + cls;
+  pill.textContent = t(!tr.enabled ? "Off" : st.state === "error" ? "Error" : st.state === "applied" ? "Active" : "On");
+  pill.className = "pill" + (tr.enabled && st.state !== "error" ? "" : " off");
+}
+function trStatus(st) {
+  if (!st) return;
+  const k = JSON.stringify(st); if (k === trStatus.k) return;
+  trStatus.k = k; trState = st;
+  if (S && S.training) trRenderStatus();
+}
+function trChanged(now) {   // saved (and sent to the game) by itself, like every other setting
+  renderTraining();
+  clearTimeout(trTimer);
+  trTimer = setTimeout(async () => {
+    const tr = S.training;
+    if (!tr.licenseAccepted) return;
+    const slots = tr.slots.map(s => s.unit < -1 ? Object.assign({}, s, { pool: trCatPool(s.unit) }) : s);   // random by category: units to draw from
+    const r = await call("trainingApply", { enabled: tr.enabled, slots, randomStage: tr.randomStage, consumeCost: tr.consumeCost, partner: trPartner(), pool: TR_POOL });
+    if (r && r.ok === false) { toast(r.error || "Could not save", true); if (tr.enabled && !tr.installed) { tr.enabled = false; renderTraining(); } return; }
+    if (tr.enabled) tr.installed = true;
+    const s = $("#saved"); s.classList.add("show"); clearTimeout(s._h); s._h = setTimeout(() => s.classList.remove("show"), 1400);
+  }, now ? 0 : 400);
+}
+function trOpenPicker(slot) {
+  trPickSlot = slot; trCost = 0; $("#tr-search").value = "";
+  $("#tr-pick-title").textContent = t("Unit for: {who}", { who: t(TR_SLOTS[slot][0]) });
+  $("#tr-pick").style.display = "";
+  trRenderPicker();
+  setGp(null);
+  if (document.body.classList.contains("pad")) setGp($("#tr-grid button.on") || $("#tr-grid button"));
+  else $("#tr-search").focus();
+}
+function trStepCost(d) { trCost = (trCost + d + TR_COSTS.length) % TR_COSTS.length; trRenderPicker(); setGp($("#tr-grid button")); }
+function trRenderPicker() {
+  $("#tr-costs").innerHTML = TR_COSTS.map(([l], i) => `<button data-c="${i}"${i === trCost ? ' class="on"' : ""}>${esc(t(l))}</button>`).join("");
+  for (const b of $$("#tr-costs button")) b.onclick = () => { trCost = +b.dataset.c; trRenderPicker(); };
+  const q = $("#tr-search").value.trim().toLowerCase(), c = TR_COSTS[trCost][1], cur = S.training.slots[trPickSlot].unit;
+  const list = TR_UNITS.filter(u => (c === null || (c === "boss" ? u[3] !== "normal" : u[3] === "normal" && u[2] === c)) && (!q || u[1].toLowerCase().includes(q)));
+  const cats = TR_CATS.filter(([id]) => c === null || (c === "boss" ? id === -9 : id === -c)).map(([id, l]) => [id, t(l)]);
+  const special = q ? [] : (c === null ? (trPickSlot === 0 ? [[0, t("Picked in game")]] : []).concat([[-1, t("Random")]]) : []).concat(cats);
+  $("#tr-grid").innerHTML =
+    special.map(([id, l]) => `<button data-id="${id}"${id === cur ? ' class="on"' : ""}><span class="im sym">${id === -1 ? "?" : id === -9 ? "B?" : id < -1 ? -id + "?" : "✦"}</span><div class="lb">${esc(l)}</div></button>`).join("") +
+    list.map(u => `<button data-id="${u[0]}"${u[0] === cur ? ' class="on"' : ""}><span class="im" style="background-image:url('${u[4]}')"></span><div class="lb">${esc(u[1])}<small>${u[3] === "normal" ? u[2] : esc(t(u[3] === "boss" ? "Boss" : "CPU"))}</small></div></button>`).join("") +
+    (list.length || special.length ? "" : `<div class="none">${esc(t("No unit matches"))}</div>`);
+  for (const b of $$("#tr-grid button")) b.onclick = () => { S.training.slots[trPickSlot].unit = +b.dataset.id; trCloseModals(); trChanged(true); };
+}
+$("#tr-search").oninput = trRenderPicker;
+$("#tr-pick-close").onclick = trCloseModals;
+$("#tr-licbox-close").onclick = trCloseModals;
+$("#tr-pick").onclick = e => { if (e.target.id === "tr-pick") trCloseModals(); };
+window.addEventListener("keydown", e => { if (e.code === "Escape" && trModal()) { e.preventDefault(); trCloseModals(); } });
+$("#tr-on").onchange = e => { S.training.enabled = e.target.checked; trChanged(true); };
+$("#tr-stage").onchange = e => { S.training.randomStage = e.target.checked; trChanged(); };
+$("#tr-cost").onchange = e => { S.training.consumeCost = e.target.checked; trChanged(); };
+$("#tr-lic-read").onclick = async () => { const r = await call("trainingLicense"); $("#tr-lic-text").textContent = (r && r.text) || ""; $("#tr-licbox").style.display = ""; };
+$("#tr-lic-ok").onclick = async () => { await call("trainingAccept"); S.training.licenseAccepted = true; renderTraining(); toast("License accepted: you can turn Custom Training on"); };
+$("#tr-ov-btn").onclick = async () => {
+  const r = await call("installOverlay");
+  if (r && r.ok === false) return toast(r.error, true);
+  S.files.overlay = true; S.files.overlayStatus = "current"; renderOverlayBanner(); renderSplit(); renderTraining(); toast("Overlay installed");
+};
+
 // ================================================================ controller navigation (Gamepad API, standard mapping)
 // LT/RT pages · LB/RB categories · stick/D-pad move · A select · B back · X play mode · Start play.
-const PAGES = ["play", "split", "settings", "online", "mods"];
+const PAGES = ["play", "split", "training", "settings", "online", "mods"];
 const curPage = () => PAGES.find(p => $("#page-" + p).classList.contains("active"));
 let gpEl = null, padPrev = [], padHeld = null, padNext = 0, padWaitRelease = false;
 
@@ -1517,7 +1813,7 @@ window.addEventListener("mousemove", () => setPadMode(false));
 window.addEventListener("keydown", () => setPadMode(false), true);
 
 function focusables() {
-  const page = $("#page-" + curPage());
+  const page = trModal() || $("#page-" + curPage());
   return [...page.querySelectorAll("button, input:not([type=checkbox]), select, .switch, .cap, .q")].filter(el => {
     if (el.disabled || el.closest(".switch") && el !== el.closest(".switch")) return false;
     const r = el.getBoundingClientRect();
@@ -1577,6 +1873,14 @@ function onPad(b) {
   setPadMode(true);
   if (creditsOpen()) { if (b === "a" || b === "b" || b === "start") closeCredits(); return; }
   if (updOpen()) { if (b === "a" || b === "start") startUpdate(); else if (b === "b") closeUpdateNotes(); return; }
+  if (trModal()) {   // unit picker / license text: the stick moves, LB/RB cost tabs, A picks, B closes
+    if (/INPUT/.test(document.activeElement?.tagName || "")) { if (b === "a" || b === "b") document.activeElement.blur(); return; }
+    if (b === "b") { trCloseModals(); return; }
+    if ((b === "lb" || b === "rb") && $("#tr-pick").style.display !== "none") { trStepCost(b === "lb" ? -1 : 1); return; }
+    if (["up", "down", "left", "right"].includes(b)) return moveGp(b);
+    if (b === "a") return activateGp();
+    return;
+  }
   const page = curPage();
   // a keyboard key is being captured: B cancels it
   if (listening && !ctrlTab.startsWith("pad")) { if (b === "b") { listening = null; renderKeyboard(); } return; }
@@ -1611,7 +1915,7 @@ function onPad(b) {
   if (b === "a") return activateGp();
   if (b === "b") { if (page !== "play") { showPage("play"); setGp($("#play-btn")); } return; }
   if (b === "x" && page === "play") {
-    const modes = ["client", "lm", "both"]; S.app.mode = modes[(modes.indexOf(S.app.mode) + 1) % 3]; changed();
+    const modes = ["client", "lm", "both"]; S.app.mode = modes[(modes.indexOf(S.app.mode) + 1) % 3]; changed(); renderPlayBtn();
   }
 }
 
@@ -1659,7 +1963,7 @@ requestAnimationFrame(padLoop);
     sync(); sw.addEventListener("change", sync);
   }
   const st = $("#n2n-static"); st.checked = !S.n2n.dhcp; st.onchange = () => { S.n2n.dhcp = !st.checked; changed(); };
-  renderCats(); renderOpts(); renderQuick(); renderOverlayBanner(); renderSplit();
+  renderCats(); renderOpts(); renderQuick(); renderOverlayBanner(); renderSplit(); renderTraining();
   setBackground(S.background);
   setTimeout(() => call("uiReady"), 30);   // the host shows the window (and closes its splash) once the page is drawn
   const mmOk = !!S.files.modManager;
