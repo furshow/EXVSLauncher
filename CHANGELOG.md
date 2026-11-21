@@ -3,6 +3,13 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
+## [Unreleased]
+### Custom Training
+- **Teams of your choice, up to 4 units**: 1v1, 1v2, 2v1, 1v3, 2v2 or 3v1. Each team has a **＋ Add CPU** button
+  (while there's room), every CPU card a **✕** to take it out of the match, and any CPU card can be **dragged to
+  the other team**. The enemy team always keeps at least one CPU. The mode shows between the teams.
+- Team cost, the result screen and the rematch work in every layout. Needs EXVS Overlay 1.2.1.
+
 ## [1.3.0] - 2026-11-21
 - Bundles **EXVS Overlay 1.2.0** (it runs Custom Training inside the game).
 ### Play button
