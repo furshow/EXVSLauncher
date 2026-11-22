@@ -698,7 +698,7 @@ const mock = {
   },
   status: { client: false, lm: false, server: false, n2n: { running: false, connected: false, ip: "" }, log: [], busy: "", training: { state: "nogame", message: "" }, card: { state: "online", local: false, ms: 84, url: "http://card.example.com/" } },
 };
-async function steamAdd() {
+async function steamAddClick() {
   const st = S.steam || {};
   if (st.running && !confirm(t("Steam will close and open again to add EXVS Launcher. Continue?"))) return;
   toast("Adding to Steam…");
@@ -708,7 +708,7 @@ async function steamAdd() {
   toast(r.added ? "Added to Steam" : "Steam shortcut updated");
   renderOpts();
 }
-async function steamOpen() {
+async function steamOpenClick() {
   const r = await call("steamOpen");
   if (!r || r.ok === false) toast((r && r.error) || "Could not open Steam", true);
   else toast("Opening from Steam…");
@@ -918,8 +918,8 @@ const CATS = {
         return h; },
       actions: () => { const st = S.steam || {};
         if (!st.installed) return [];
-        const add = [st.added ? "Update shortcut" : "Add to Steam", () => steamAdd(), st.added ? "" : "primary"];
-        return st.added && !st.fromSteam ? [["Open through Steam", () => steamOpen(), "primary"], add] : [add]; } },
+        const add = [st.added ? "Update shortcut" : "Add to Steam", () => steamAddClick(), st.added ? "" : "primary"];
+        return st.added && !st.fromSteam ? [["Open through Steam", () => steamOpenClick(), "primary"], add] : [add]; } },
     { section: "Game folder" },
     { type: "actions", label: "Game folder", desc: () => S.gameDir, actions: [["Open folder", () => call("openFolder")]] },
     { type: "actions", label: "Force close the game", desc: "Closes the Client and Live Monitor right away.", actions: [["Close game", async () => { if (confirm(t("Force close the game?"))) await call("stopGame"); }, "danger"]] },
