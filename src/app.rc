@@ -1,5 +1,6 @@
 // Resources: manifest, icon, the embedded EXVS Overlay DLL (Settings > In-game overlay > Install) and the
-// Custom Training files (written to <game>\Training\ when Custom Training is turned on).
+// Custom Training files (written to <game>\Training\ when Custom Training is turned on) and M1kou's replay patch
+// (written to <game>\Replay\ when Replays is turned on).
 1 24 "app.manifest"
 APPICON ICON "../build/gen/app.ico"
 OVERLAY_DLL RCDATA "../build/gen/xinput9_1_0.dll"
@@ -8,3 +9,7 @@ TRAINING_ENTRY RCDATA "../third_party/training2v2/training-entry.ini"
 TRAINING_LICENSE RCDATA "../third_party/training2v2/LICENSE-TrainingExtension.txt"
 TRAINING_MINHOOK RCDATA "../third_party/training2v2/MinHook-LICENSE.txt"
 TRAINING_README RCDATA "../third_party/training2v2/README.txt"
+REPLAY_DLL RCDATA "../third_party/replay/EXVSReplay.dll"
+REPLAY_CONFIG RCDATA "../third_party/replay/xinputPatchConfig.ini"
+REPLAY_README RCDATA "../third_party/replay/README.txt"
+REPLAY_MINHOOK RCDATA "../third_party/replay/MinHook-LICENSE.txt"

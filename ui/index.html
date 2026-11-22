@@ -612,8 +612,14 @@ body.pad .pad-hint { display: block; }
       <li><b>AMD FidelityFX Super Resolution 1</b> (overlay, upscaling) — MIT License, © 2021 Advanced Micro Devices, Inc.</li>
       <li>Built with <b>Zig</b> / Clang</li>
     </ul>
-    <div class="cr-sec">Thanks</div>
-    <p>SnowLauncher, whose settings this launcher keeps compatible, and the EXVS community.</p>
+    <div class="cr-sec">Special thanks</div>
+    <ul>
+      <li><b>SnowLauncher</b> by <b>Snow</b> (某学习C#时长2天半的练习生) — the original EXVS launcher; its settings stay compatible with this one.</li>
+      <li><b>aerial</b> — "2v2 Training Extension", the bridge behind Custom Training.</li>
+      <li><b>M1kou</b> — "EXVS multi-function patch", the replay patch behind Replays on every machine.</li>
+      <li><b>ESVS2IB 4P launcher</b> — the Chinese launcher that inspired Splitscreen.</li>
+      <li>And the whole <b>EXVS community</b>.</li>
+    </ul>
     <p class="cr-legal">Fan-made tool, free and non-commercial. Not affiliated with or endorsed by Bandai Namco or Sunrise. Mobile Suit Gundam and Extreme VS. 2 Infinite Boost are trademarks of their respective owners.</p>
     <button class="btn primary" id="cr-close">Close</button>
   </div>
@@ -685,6 +691,7 @@ const mock = {
       p: [{ input: "xinput:0", chipId: "Player1", accessCode: "0000", serial: "XXXX", monitor: 0 }, { input: "xinput:1", chipId: "Player1_P2", accessCode: "0000", serial: "k3Zp", monitor: 0 },
           { input: "keyboard", chipId: "Player1_P3", accessCode: "0000", serial: "Q7mw", monitor: 1 }, { input: "xinput:3", chipId: "Player1_P4", accessCode: "0000", serial: "fa2D", monitor: 1 }],
       pending: { ips: "", iface: "", converted: false } },
+    replay: { enabled: false, overlayMin: "1.2.4" },
     training: { licenseAccepted: false, installed: false, enabled: false, randomStage: false, consumeCost: true, teamCost: [0, 8000], overlayMin: "1.2.3",
       slots: [{ unit: 0, level: 0, ex: -1, team: 0, on: true }, { unit: 1001001, level: 2, ex: 0, team: 0, on: true }, { unit: -1, level: 3, ex: 1, team: 1, on: true }, { unit: 601001001, level: 4, ex: 2, team: 1, on: true }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }] },
   },
@@ -834,6 +841,13 @@ const CATS = {
     toggle({ label: "Quick skin change", desc: "Lets you change the unit's skin quickly on the unit select screen.", get: () => S.cfg.enableQuickSkinChange, set: v => S.cfg.enableQuickSkinChange = v }),
     cycle({ label: "Region", desc: "Arcade location shown to other players (Japanese prefecture).", type: "select",
       values: () => REGIONS.map((n, i) => `${String(i + 1).padStart(2, "0")} · ${n}`), get: () => S.cfg.region - 1, set: v => S.cfg.region = v + 1 }),
+    { section: "Replays" },
+    toggle({ label: "Replays on every machine", desc: "The game keeps a match replay only on one of the machines (the one it sends to the Live Monitor). With this on, every machine keeps its own copy, in the game's replay list. Like the game, only matches with 4 human players are recorded. Uses M1kou's replay patch, loaded by the EXVS Overlay.",
+      extra: () => { const ov = S.files.overlayStatus, min = (S.replay && S.replay.overlayMin) || "1.2.4";
+        const old = ov === "missing" || ov === "outdated" || (ov !== "newer" && cmpVer(S.files.overlayVersion || "0", min) < 0);
+        return old ? `<p class="warn">${t("Needs the EXVS Overlay {v} or newer: it loads the replay patch inside the game.", { v: min })}</p><button class="btn primary" onclick="installOverlayNow()">${t(ov === "missing" ? "Install overlay" : "Update overlay")}</button>` : ""; },
+      get: () => !!(S.replay && S.replay.enabled), set: async v => { const r = await call("replaySet", v); if (r && r.ok === false) { toast(r.error, true); return false; }
+        S.replay = Object.assign(S.replay || {}, { enabled: v }); toast(v ? "Replays on every machine: on" : "Replays on every machine: off"); }, noSave: true }),
     { section: "Launcher" },
     toggle({ label: "Close launcher on Play", desc: "Closes this window a few seconds after the game starts. N2N stays connected while the game runs.", get: () => S.app.closeOnPlay, set: v => S.app.closeOnPlay = v }),
   ]},
@@ -1326,7 +1340,7 @@ async function installOverlayNow() {
   const r = await call("installOverlay");
   if (r && r.ok === false) { toast(r.error, true); return; }
   S.files.overlay = true; S.files.overlayStatus = "current";
-  renderOverlayBanner(); if (cat === "graphics") renderOpts();
+  renderOverlayBanner(); if (cat === "graphics" || cat === "gameplay") renderOpts();
   toast(running ? "Overlay updated: restart the game to use it" : "Overlay installed");
 }
 $("#ov-btn").onclick = installOverlayNow;

@@ -44,3 +44,6 @@ desktop.ini
 # Custom Training: aerial's 2v2 Training Extension files shipped unmodified (embedded in the exe)
 !third_party/training2v2/*.dll
 !third_party/training2v2/*.ini
+# Replays: M1kou's replay patch shipped unmodified with the author's permission (embedded in the exe)
+!third_party/replay/*.dll
+!third_party/replay/*.ini

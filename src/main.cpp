@@ -329,6 +329,7 @@ static const char *overlay_status() {
 
 static json split_get_state(const json &cfg);   // split.h
 static json training_get_state();                // training.h
+static json replay_get_state();                  // replay.h
 static void split_save_state(const json &sp);
 static json get_state() {
     Ini sl(L"SnowLauncher.ini"), cfg(L"config.ini"), card(L"card.ini"), me(L"EXVSLauncher.ini");
@@ -368,6 +369,7 @@ static json get_state() {
     s["cfg"] = c;
     s["split"] = split_get_state(c);
     s["training"] = training_get_state();
+    s["replay"] = replay_get_state();
 
     json kb = json::object();
     const char *kb_secs[][2] = { {"client", "Game_Client_Keyboard"}, {"lm", "Game_LM_Keyboard"} };
@@ -1174,6 +1176,7 @@ static json pad_state_di(const std::string &name) {
 
 #include "split.h"   // splitscreen (2-4 copies of the game on this PC)
 #include "training.h"   // Custom Training (custom VS Training matches, run by the overlay)
+#include "replay.h"   // replays on every machine (M1kou's replay patch, loaded by the overlay)
 #include "cardserver.h"   // card server status chip (local or remote)
 
 // ---------------------------------------------------------------------------------------------
@@ -1501,6 +1504,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     if (argc >= 5 && wcscmp(argv[1], L"--split-helper") == 0) return split_helper(argv[2], argv[3], wcstoul(argv[4], NULL, 10));
     if (argc >= 4 && wcscmp(argv[1], L"--split-selftest") == 0) return split_selftest(argv[2], argv[3]);
     if (argc >= 4 && wcscmp(argv[1], L"--training-test") == 0) return training_selftest(argv[2], argv[3]);
+    if (argc >= 4 && wcscmp(argv[1], L"--replay-test") == 0) return replay_selftest(argv[2], argv[3]);
     if (argc >= 4 && wcscmp(argv[1], L"--card-test") == 0) return card_selftest(argv[2], argv[3]);
     if (argc >= 4 && wcscmp(argv[1], L"--split-helper-test") == 0) {
         // --split-helper-test <game dir> <out.json>: the network helper without the UAC prompt (unelevated, so Windows
@@ -1690,6 +1694,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
             std::string text = r ? std::string((const char *)LockResource(LoadResource(NULL, r)), SizeofResource(NULL, r)) : "";
             if (text.size() >= 3 && (unsigned char)text[0] == 0xEF) text = text.substr(3);
             return json({ {"text", text} }).dump();
+        });
+        async("replaySet", [&](json a) {
+            json r = replay_set(a.is_array() && !a.empty() && a[0].is_boolean() && a[0].get<bool>());
+            if (r.value("ok", false)) last_state["replay"] = replay_get_state();
+            return r;
         });
         async("installOverlay", [](json) { return install_overlay(); });
         async("openCardServer", [](json) { return open_card_server(); });
