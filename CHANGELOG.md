@@ -3,11 +3,12 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
-## [Unreleased]
+## [1.5.0] - 2026-11-22
+- Bundles **EXVS Overlay 1.2.4** (unchanged).
 ### Steam
-- **Add to Steam** (Settings > Launcher > Steam): adds EXVS Launcher to the Steam library as a non-Steam game, for
-  every Steam account on the PC (an existing entry is updated, never duplicated; the old `shortcuts.vdf` is kept as
-  `shortcuts.vdf.bak`). If Steam is open, it closes and opens again, since Steam only reads its shortcuts at start.
+- **Add to Steam** (Settings > Launcher > Steam): adds the launcher to the Steam library as a non-Steam game, named
+  "Gundam Extreme VS 2 Infinite Boost", for every Steam account on the PC (an existing entry is updated, never
+  duplicated; the old `shortcuts.vdf` is kept as `shortcuts.vdf.bak`). If Steam is open, it closes and opens again, since Steam only reads its shortcuts at start.
 - **Open through Steam**: starts the launcher again from Steam. Opened from Steam, Steam Input reaches the launcher
   and the game: the Steam Link on-screen controller, a Steam Deck or any pad Steam supports works as an Xbox
   controller, also in Split screen. Same shortcut format as Supermedo's Bloodborne PC launcher.
