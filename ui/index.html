@@ -307,7 +307,8 @@ body.pad .pad-hint { display: block; }
 .tr-field { display: grid; grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr); gap: 14px; align-items: start; }
 .tr-field .tr-vs { align-self: center; }
 .tr-team { display: grid; gap: 12px; }
-.tr-team h3 { margin: 0 0 -2px 2px; font: 600 11.5px var(--head); letter-spacing: 2.2px; text-transform: uppercase; color: var(--tc); }
+.tr-team h3 { margin: 0 0 -2px 2px; font: 600 11.5px var(--head); letter-spacing: 2.2px; text-transform: uppercase; color: var(--tc); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tr-team h3 .tr-tc { width: auto; min-width: 0; padding: 3px 6px; font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text); }
 .tr-vs { text-align: center; font: italic 700 30px var(--head); letter-spacing: 1px; color: #fff; text-shadow: 0 0 16px var(--accent-glow), 0 0 26px rgba(255,61,85,0.45); }
 .tr-slot { position: relative; display: grid; grid-template-columns: 171px minmax(0, 1fr); gap: 14px; padding: 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); transition: border-color .15s; }
 .tr-slot::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tc); box-shadow: 0 0 10px var(--tc); }
@@ -682,7 +683,7 @@ const mock = {
       p: [{ input: "xinput:0", chipId: "Player1", accessCode: "0000", serial: "XXXX", monitor: 0 }, { input: "xinput:1", chipId: "Player1_P2", accessCode: "0000", serial: "k3Zp", monitor: 0 },
           { input: "keyboard", chipId: "Player1_P3", accessCode: "0000", serial: "Q7mw", monitor: 1 }, { input: "xinput:3", chipId: "Player1_P4", accessCode: "0000", serial: "fa2D", monitor: 1 }],
       pending: { ips: "", iface: "", converted: false } },
-    training: { licenseAccepted: false, installed: false, enabled: false, randomStage: false, consumeCost: true, overlayMin: "1.2.2",
+    training: { licenseAccepted: false, installed: false, enabled: false, randomStage: false, consumeCost: true, teamCost: [0, 8000], overlayMin: "1.2.3",
       slots: [{ unit: 0, level: 0, ex: -1, team: 0, on: true }, { unit: 1001001, level: 2, ex: 0, team: 0, on: true }, { unit: -1, level: 3, ex: 1, team: 1, on: true }, { unit: 601001001, level: 4, ex: 2, team: 1, on: true }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }] },
   },
   status: { client: false, lm: false, server: false, n2n: { running: false, connected: false, ip: "" }, log: [], busy: "", training: { state: "nogame", message: "" }, card: { state: "online", local: false, ms: 84, url: "http://card.example.com/" } },
@@ -1689,6 +1690,14 @@ function trSlotHtml(i) {
 // (the 5th to 10th run on the overlay's longer unit list), at least one enemy. Older settings (a "partner"
 // switch, 3-5 CPU slots) come in as team / on from the launcher too.
 const TR_CPU_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9], TR_MAX = 10;
+// total team cost per team (0 = the game's 6000); the overlay sets it while a match runs with team cost on
+const TR_TEAM_COSTS = [0, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 15000, 20000, 30000];
+function trCostSel(team) {
+  const tr = S.training, v = (tr.teamCost || [0, 0])[team] || 0, list = TR_TEAM_COSTS.includes(v) ? TR_TEAM_COSTS : TR_TEAM_COSTS.concat(v);
+  const off = tr.consumeCost === false;
+  return `<select class="tr-tc" data-tc="${team}"${off ? " disabled" : ""} title="${esc(t(off ? "Turn on Team cost to pick each team's cost" : "Total team cost"))}">` +
+    list.map(c => `<option value="${c}"${c === v ? " selected" : ""}>${esc(c ? t("Cost {n}", { n: c }) : t("Cost 6000 (game)"))}</option>`).join("") + "</select>";
+}
 const trCpus = team => TR_CPU_SLOTS.filter(i => S.training.slots[i].on !== false && S.training.slots[i].team === team);
 const trCount = () => ({ a: trCpus(0).length, e: trCpus(1).length });
 const trMode = () => { const c = trCount(); return `${1 + c.a}v${c.e}`; };
@@ -1712,11 +1721,12 @@ function renderTraining() {
   const c = trCount(), total = 1 + c.a + c.e, mode = trMode();
   const add = team => total < TR_MAX && !(team === 0 && c.a >= TR_MAX - 2) ? `<button class="tr-add" data-add="${team}">＋ ${esc(t("Add CPU"))}</button>` : "";
   $("#tr-field").innerHTML =
-    `<div class="tr-team" data-side="0" style="--tc:var(--accent-hi)"><h3>${esc(t("Your team"))}</h3>${trSlotHtml(0)}${trCpus(0).map(trSlotHtml).join("")}${add(0)}</div>
+    `<div class="tr-team" data-side="0" style="--tc:var(--accent-hi)"><h3><span>${esc(t("Your team"))}</span>${trCostSel(0)}</h3>${trSlotHtml(0)}${trCpus(0).map(trSlotHtml).join("")}${add(0)}</div>
      <div class="tr-vs">${mode === "2v2" ? "VS" : mode}</div>
-     <div class="tr-team en" data-side="1" style="--tc:#ff7083"><h3>${esc(t("Enemy team"))}</h3>${trCpus(1).map(trSlotHtml).join("")}${add(1)}</div>`;
+     <div class="tr-team en" data-side="1" style="--tc:#ff7083"><h3><span>${esc(t("Enemy team"))}</span>${trCostSel(1)}</h3>${trCpus(1).map(trSlotHtml).join("")}${add(1)}</div>`;
   for (const b of $$("#tr-field [data-pick]")) b.onclick = () => trOpenPicker(+b.dataset.pick);
   for (const el of $$("#tr-field select[data-tr]")) el.onchange = () => { S.training.slots[+el.dataset.n][el.dataset.tr] = +el.value; trChanged(); };
+  for (const el of $$("#tr-field select[data-tc]")) el.onchange = () => { const tc = (S.training.teamCost || [0, 0]).slice(); tc[+el.dataset.tc] = +el.value; S.training.teamCost = tc; trChanged(); };
   for (const b of $$("#tr-field [data-rm]")) b.onclick = () => { const s = S.training.slots[+b.dataset.rm]; if (s.team === 1 && trCount().e === 1) return; s.on = false; trChanged(true); };
   for (const b of $$("#tr-field [data-add]")) b.onclick = () => { const i = TR_CPU_SLOTS.find(k => S.training.slots[k].on === false); if (i) trMove(i, +b.dataset.add); };
   // drag any CPU card to the other team
@@ -1776,7 +1786,7 @@ function trChanged(now) {   // saved (and sent to the game) by itself, like ever
     const tr = S.training;
     if (!tr.licenseAccepted) return;
     const slots = tr.slots.map(s => s.unit < -1 ? Object.assign({}, s, { pool: trCatPool(s.unit) }) : s);   // random by category: units to draw from
-    const r = await call("trainingApply", { enabled: tr.enabled, slots, randomStage: tr.randomStage, consumeCost: tr.consumeCost, pool: TR_POOL });
+    const r = await call("trainingApply", { enabled: tr.enabled, slots, randomStage: tr.randomStage, consumeCost: tr.consumeCost, teamCost: tr.teamCost || [0, 0], pool: TR_POOL });
     if (r && r.ok === false) { toast(r.error || "Could not save", true); if (tr.enabled && !tr.installed) { tr.enabled = false; renderTraining(); } return; }
     if (tr.enabled) tr.installed = true;
     const s = $("#saved"); s.classList.add("show"); clearTimeout(s._h); s._h = setTimeout(() => s.classList.remove("show"), 1400);
@@ -1812,7 +1822,7 @@ $("#tr-pick").onclick = e => { if (e.target.id === "tr-pick") trCloseModals(); }
 window.addEventListener("keydown", e => { if (e.code === "Escape" && trModal()) { e.preventDefault(); trCloseModals(); } });
 $("#tr-on").onchange = e => { S.training.enabled = e.target.checked; trChanged(true); };
 $("#tr-stage").onchange = e => { S.training.randomStage = e.target.checked; trChanged(); };
-$("#tr-cost").onchange = e => { S.training.consumeCost = e.target.checked; trChanged(); };
+$("#tr-cost").onchange = e => { S.training.consumeCost = e.target.checked; trChanged(true); };
 $("#tr-lic-read").onclick = async () => { const r = await call("trainingLicense"); $("#tr-lic-text").textContent = (r && r.text) || ""; $("#tr-licbox").style.display = ""; };
 $("#tr-lic-ok").onclick = async () => { await call("trainingAccept"); S.training.licenseAccepted = true; renderTraining(); toast("License accepted: you can turn Custom Training on"); };
 $("#tr-ov-btn").onclick = async () => {
