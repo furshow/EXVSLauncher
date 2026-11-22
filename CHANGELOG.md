@@ -3,7 +3,8 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
-## [Unreleased]
+## [1.3.3] - 2026-11-22
+- Bundles **EXVS Overlay 1.2.3** (team cost per team in Custom Training).
 ### Custom Training
 - **Team cost per team**: each team on the **Custom** page has a cost box (numbers only, 1500 to 99000; 6000 is the
   game's), for matches like 1v2 with more cost for you. Needs **Team cost** on and EXVS Overlay 1.2.3.

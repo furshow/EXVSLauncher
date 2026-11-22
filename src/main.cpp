@@ -34,7 +34,7 @@
 #include "overlay_version.h"   // OVERLAY_BUNDLED_VERSION, generated from ../EXVSOverlay/src/menu.h
 
 using json = nlohmann::json;
-static const char *VERSION = "1.3.2";
+static const char *VERSION = "1.3.3";
 
 // ---------------------------------------------------------------------------------------------
 // strings / paths
