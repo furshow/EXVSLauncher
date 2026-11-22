@@ -497,6 +497,10 @@
     ["The enemy team needs a CPU", "El equipo enemigo necesita un CPU", "敌方队伍至少需要一台 CPU", "敵チームにはCPUが必要です"],
     ["Your team is full (4 units at most)", "Tu equipo está lleno (4 unidades como máximo)", "你的队伍已满（最多 4 台机体）", "自チームはいっぱいです（最大4機）"],
     ["The match is full (10 units at most)", "La partida está llena (10 unidades como máximo)", "对战已满（最多 10 台机体）", "対戦はいっぱいです（最大10機）"],
+    ["Cost", "Costo", "COST", "コスト"],
+    ["Total team cost (1500 or more)", "Costo total del equipo (1500 o más)", "队伍总 COST（1500 以上）", "チームの総コスト（1500以上）"],
+    ["Team cost goes from {a} to {b}", "El costo de equipo va de {a} a {b}", "队伍 COST 范围为 {a} 到 {b}", "チームコストは{a}〜{b}です"],
+    ["Turn on Team cost to pick each team's cost", "Activa Costo de equipo para elegir el costo de cada equipo", "开启队伍 COST 后可设置每队的 COST", "チームコストをオンにすると各チームのコストを選べます"],
     ["Your team is full (9 units at most)", "Tu equipo está lleno (9 unidades como máximo)", "你的队伍已满（最多 9 台机体）", "自チームはいっぱいです（最大9機）"],
     ["Active: VS Training is a {m}", "Activo: el VS Training es un {m}", "已生效：VS 训练为 {m}", "有効：VSトレーニングは{m}"],
     // card server chip

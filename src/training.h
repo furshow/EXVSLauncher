@@ -15,9 +15,10 @@
 //   each match; Ex1 -1 = the one picked in game), RandomStage, ConsumeCost (losing a unit costs team cost, COST
 //   OVER ends the match), Pool (random units), Team2..10 (0 your team, 1 enemy team) and On2..10 (1 in the match,
 //   0 out) for the CPU slots: at least one enemy, 10 units at most (slots 5-10 need the overlay 1.2.2: units past
-//   the bridge's 4); Partner (slot 2 only: 1 ally, 0 out, 2 enemy) for overlays older than 1.2.1.
+//   the bridge's 4); TeamCost1 / TeamCost2 (total team cost of your team / the enemy team, 1500-99000, 0 = the
+//   game's 6000; with ConsumeCost on, overlay 1.2.3+); Partner (slot 2 only: 1 ally, 0 out, 2 enemy) for overlays older than 1.2.1.
 
-static const char *TRAINING_OVERLAY_MIN = "1.2.2";
+static const char *TRAINING_OVERLAY_MIN = "1.2.3";
 static const int TRAINING_MAX_UNITS = 10;   // you + 9 CPU slots (the overlay adds the units past the bridge's 4)
 static const char *TRAINING_LICENSE_ID = "aerial-noncommercial-1.0";
 
@@ -86,10 +87,12 @@ static json training_get_state() {
              {"installed", exists(training_dir() + L"training_bridge.dll")},
              {"enabled", training_get("Enabled", 0) != 0}, {"slots", slots},
              {"randomStage", training_get("RandomStage", 0) != 0}, {"consumeCost", training_get("ConsumeCost", 1) != 0},
+             {"teamCost", json::array({ training_get("TeamCost1", 0), training_get("TeamCost2", 0) })},
              {"overlayMin", TRAINING_OVERLAY_MIN} };
 }
 
-// {enabled, slots:[{unit,level,ex,team,on}x10 (x4-6 from older pages)], randomStage, consumeCost, pool:[ids]}
+// {enabled, slots:[{unit,level,ex,team,on}x10 (x4-6 from older pages)], randomStage, consumeCost, teamCost:[yours,
+// enemy] (0 = the game's), pool:[ids]}
 static json training_apply(const json &t) {
     if (Ini(L"EXVSLauncher.ini").get("Training", "LicenseAccepted") != TRAINING_LICENSE_ID)
         return { {"ok", false}, {"error", "Accept the Custom Training license first"} };
@@ -141,6 +144,12 @@ static json training_apply(const json &t) {
     training_set("Pool", pool);
     training_set("RandomStage", jb(t, "randomStage", false) ? "1" : "0");
     training_set("ConsumeCost", jb(t, "consumeCost", true) ? "1" : "0");
+    for (int k = 0; k < 2; k++) {   // total team cost: 0 = the game's 6000, else 1500-99000
+        int v = t.contains("teamCost") && t["teamCost"].is_array() && t["teamCost"].size() > (size_t)k && t["teamCost"][k].is_number_integer()
+                ? t["teamCost"][k].get<int>() : 0;
+        v = v <= 0 || v == 6000 ? 0 : std::max(1500, std::min(99000, v));
+        training_set(("TeamCost" + std::to_string(k + 1)).c_str(), std::to_string(v));
+    }
     // Partner for overlays older than 1.2.1 (slot 2 only): 1 ally, 0 off, 2 enemy
     training_set("Partner", !slot_on[1] ? "0" : team[1] ? "2" : "1");
     training_set("Enabled", on ? "1" : "0");
@@ -187,6 +196,9 @@ static int training_selftest(const wchar_t *dir, const wchar_t *out) {
     r["apply1v9"] = training_apply(t19);
     json t91 = t55; for (int i = 1; i < 10; i++) t91["slots"][i]["team"] = i == 9 ? 1 : 0;   // 9v1
     r["apply9v1"] = training_apply(t91);
+    json tc = t55; tc["teamCost"] = json::array({ 9000, 100 });   // custom team cost (enemy raised to 1500)
+    r["applyTeamCost"] = training_apply(tc);
+    r["teamCost"] = training_get_state()["teamCost"];
     json t11 = t55; t11["slots"].push_back(t11["slots"][9]);   // 11 slots: refused
     r["apply11"] = training_apply(t11);
     std::string text;
