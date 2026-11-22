@@ -12,7 +12,7 @@
 // running Steam is shut down first (steam.exe -shutdown) and started again afterwards.
 #pragma once
 
-static const char *STEAM_APP_NAME = "EXVS Launcher";
+static const char *STEAM_APP_NAME = "Gundam Extreme VS 2 Infinite Boost";   // the name shown in the Steam library
 
 // ---- binary KeyValues --------------------------------------------------------------------------------------
 // Types: 0 map, 1 string, 2 int32, 3 float32, 4 pointer, 5 wide string, 6 color, 7 uint64, 8 end, 10 int64.
