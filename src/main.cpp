@@ -723,6 +723,44 @@ static void watch_window(const wchar_t *exe, int idx) {
     }).detach();
 }
 
+// Brings the game's window to the front once it shows up. Started from Steam (Big Picture, Steam Link) the game
+// window used to open behind the launcher or Steam. Windows only lets the foreground process hand the focus over,
+// so the launcher allows it (AllowSetForegroundWindow) and joins the input of the current foreground thread.
+static void focus_window_once(HWND h) {
+    HWND fg = GetForegroundWindow();
+    DWORD me = GetCurrentThreadId(), fg_t = fg ? GetWindowThreadProcessId(fg, NULL) : 0, win_t = GetWindowThreadProcessId(h, NULL);
+    bool a1 = fg_t && fg_t != me && AttachThreadInput(me, fg_t, TRUE), a2 = win_t && win_t != me && AttachThreadInput(me, win_t, TRUE);
+    if (IsIconic(h)) ShowWindow(h, SW_RESTORE);
+    BringWindowToTop(h);
+    SetForegroundWindow(h);
+    SetActiveWindow(h);
+    if (a2) AttachThreadInput(me, win_t, FALSE);
+    if (a1) AttachThreadInput(me, fg_t, FALSE);
+}
+static std::atomic<int> g_focus_pending{0};   // the launcher waits for these before it exits (Close launcher on Play)
+static void focus_game(const wchar_t *exe) {
+    AllowSetForegroundWindow(ASFW_ANY);
+    std::wstring e = exe;
+    g_focus_pending++;
+    std::thread([e] {
+        struct Done { ~Done() { g_focus_pending--; } } done;
+        HWND seen = NULL; int stable = 0;
+        for (int t = 0; t < 240; t++) {   // up to ~60 s for the window to show up
+            Sleep(250);
+            auto pids = find_procs(e.c_str(), true);
+            if (pids.empty()) continue;
+            FindWin f = { pids[0], NULL, 0 };
+            EnumWindows(find_win_cb, (LPARAM)&f);
+            if (!f.best) continue;
+            stable = f.best == seen ? stable + 1 : 0; seen = f.best;
+            if (stable < 6) continue;   // let it finish creating (and the overlay place) the window
+            for (int i = 0; i < 12 && GetForegroundWindow() != f.best; i++) { focus_window_once(f.best); Sleep(250); }
+            log_line("focus: %s window %s", narrow(e).c_str(), GetForegroundWindow() == f.best ? "in front" : "could not be brought to the front");
+            return;
+        }
+    }).detach();
+}
+
 // ---------------------------------------------------------------------------------------------
 // Play / stop
 // ---------------------------------------------------------------------------------------------
@@ -777,6 +815,7 @@ static json do_play(const std::string &mode, json state) {
     if (want_client) ok &= launch(false);
     if (want_lm) { if (want_client) Sleep(1500); ok &= launch(true); }
     if (!ok) return { {"ok", false}, {"error", "Could not start the game (see EXVSLauncher.log)"} };
+    if (want_client) focus_game(CLIENT_EXE); else if (lm_default) focus_game(LM_EXE);
     for (int i = 0; i < 20 && !game_running(); i++) Sleep(500);
     return { {"ok", true} };
 }
@@ -1752,6 +1791,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
                            L"\n\nIt needs the Microsoft Edge WebView2 Runtime (included in Windows 11).").c_str(), L"EXVS Launcher", MB_ICONERROR);
         return 1;
     }
+    for (int i = 0; i < 300 && g_focus_pending > 0; i++) Sleep(200);   // a pending "bring the game to the front"
     // keep N2N up if the game is still running (closing the launcher must not drop an online match)
     if (g_n2n_running && !game_running()) n2n_stop();
     if (g_mtx) ReleaseMutex(g_mtx);

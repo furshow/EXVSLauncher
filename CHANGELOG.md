@@ -11,6 +11,9 @@ section of the released version as the release notes.
 - **Open through Steam**: starts the launcher again from Steam. Opened from Steam, Steam Input reaches the launcher
   and the game: the Steam Link on-screen controller, a Steam Deck or any pad Steam supports works as an Xbox
   controller, also in Split screen. Same shortcut format as Supermedo's Bloodborne PC launcher.
+### Fixes
+- **Play** brings the game window to the front once it opens. Started from Steam (Big Picture, Steam Link) it
+  used to open behind the launcher or Steam.
 
 ## [1.4.1] - 2026-11-22
 - Bundles **EXVS Overlay 1.2.4** (unchanged).
