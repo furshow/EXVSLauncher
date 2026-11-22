@@ -986,7 +986,9 @@ async function setToggle(i, v) {
   const it = rows[i].it;
   if (!!it.get() === v) return;
   const r = await it.set(v);
-  if (r === false) return;
+  // only the toggles that act right away (noSave: overlay, replays) can refuse with false; a plain
+  // "set: v => S.cfg.x = v" also returns false when turned off, and that must still save and redraw
+  if (it.noSave && r === false) return;
   if (!it.noSave) changed(); else renderQuick();
   renderOpts();
 }
