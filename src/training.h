@@ -1,4 +1,4 @@
-// Custom Training: custom VS Training matches (up to 5 units: 1v1 ... 4v1; CPU behavior and EX per slot).
+// Custom Training: custom VS Training matches (up to 6 units: 1v1 ... 5v1, 3v3; CPU behavior and EX per slot).
 // Included by main.cpp, not a separate unit.
 //
 // The match logic is training_bridge.dll from aerial's "2v2 Training Extension" 1.1 (free, non-commercial
@@ -8,14 +8,14 @@
 // into the bridge whenever Training\training.ini changes; it reports back in Training\status.ini.
 //
 // Training\training.ini [Training]:
-//   Enabled, Seq (bumped on every Apply), Unit1..5 (unit id, -1 random, Unit1 0 = the unit picked in game,
-//   -1500/-2000/-2500/-3000 random unit of that cost, -9 random boss: SlotPool1..5 = the ids to draw from),
-//   Cpu2..5 (CPU behavior: 0 stop, 1 easy, 2 normal, 3 hard, 4 extreme, 5 walk, 6 evade, 7/8/9 low/mid/high
-//   jump; the bridge calls it "level". Default partner normal, enemies hard), Ex1..5 (0 F, 1 S, 2 E, 3 random
+//   Enabled, Seq (bumped on every Apply), Unit1..6 (unit id, -1 random, Unit1 0 = the unit picked in game,
+//   -1500/-2000/-2500/-3000 random unit of that cost, -9 random boss: SlotPool1..6 = the ids to draw from),
+//   Cpu2..6 (CPU behavior: 0 stop, 1 easy, 2 normal, 3 hard, 4 extreme, 5 walk, 6 evade, 7/8/9 low/mid/high
+//   jump; the bridge calls it "level". Default partner normal, enemies hard), Ex1..6 (0 F, 1 S, 2 E, 3 random
 //   each match; Ex1 -1 = the one picked in game), RandomStage, ConsumeCost (losing a unit costs team cost, COST
-//   OVER ends the match), Pool (random units), Team2..5 (0 your team, 1 enemy team) and On2..5 (1 in the match,
-//   0 out) for the CPU slots: at least one enemy, 5 units at most (slot 5 needs the overlay 1.2.2: the 5th
-//   unit); Partner (slot 2 only: 1 ally, 0 out, 2 enemy) for overlays older than 1.2.1.
+//   OVER ends the match), Pool (random units), Team2..6 (0 your team, 1 enemy team) and On2..6 (1 in the match,
+//   0 out) for the CPU slots: at least one enemy, 6 units at most (slots 5-6 need the overlay 1.2.2: units past
+//   the bridge's 4); Partner (slot 2 only: 1 ally, 0 out, 2 enemy) for overlays older than 1.2.1.
 
 static const char *TRAINING_OVERLAY_MIN = "1.2.2";
 static const char *TRAINING_LICENSE_ID = "aerial-noncommercial-1.0";
@@ -68,13 +68,13 @@ static void training_set(const char *key, const std::string &v) {
 static json training_get_state() {
     Ini me(L"EXVSLauncher.ini");
     json slots = json::array();
-    // teams: Team<n> / On<n> for the CPU slots 2-5 (slot 5 out unless set); older settings only have Partner
+    // teams: Team<n> / On<n> for the CPU slots 2-6 (slots 5-6 out unless set); older settings only have Partner
     // (1 ally, 0 off, 2 enemy)
     int partner = std::max(0, std::min(2, training_get("Partner", 1)));
     bool has_teams = training_get("Team2", -1) != -1;
-    for (int i = 1; i <= 5; i++) {
+    for (int i = 1; i <= 6; i++) {
         std::string n = std::to_string(i);
-        int team = i == 1 ? 0 : has_teams ? (training_get(("Team" + n).c_str(), i == 2 ? 0 : 1) ? 1 : 0) : (i == 2 ? (partner == 2 ? 1 : 0) : 1);
+        int team = i == 1 ? 0 : has_teams ? (training_get(("Team" + n).c_str(), i == 2 || i == 6 ? 0 : 1) ? 1 : 0) : (i == 2 ? (partner == 2 ? 1 : 0) : 1);
         bool on = i == 1 || (has_teams ? training_get(("On" + n).c_str(), i < 5) != 0 : (i != 2 || partner != 0) && i < 5);
         slots.push_back({ {"unit", training_get(("Unit" + n).c_str(), i == 1 ? 0 : -1)},
                           {"level", training_get(("Cpu" + n).c_str(), i == 2 ? 2 : 3)},
@@ -88,7 +88,7 @@ static json training_get_state() {
              {"overlayMin", TRAINING_OVERLAY_MIN} };
 }
 
-// {enabled, slots:[{unit,level,ex,team,on}x5 (x4 from older pages)], randomStage, consumeCost, pool:[ids]}
+// {enabled, slots:[{unit,level,ex,team,on}x6 (x4-5 from older pages)], randomStage, consumeCost, pool:[ids]}
 static json training_apply(const json &t) {
     if (Ini(L"EXVSLauncher.ini").get("Training", "LicenseAccepted") != TRAINING_LICENSE_ID)
         return { {"ok", false}, {"error", "Accept the Custom Training license first"} };
@@ -99,11 +99,11 @@ static json training_apply(const json &t) {
     } else if (!exists(training_dir())) {
         return { {"ok", true} };   // never turned on: nothing to write
     }
-    if (!t.contains("slots") || !t["slots"].is_array() || (t["slots"].size() != 4 && t["slots"].size() != 5))
+    if (!t.contains("slots") || !t["slots"].is_array() || t["slots"].size() < 4 || t["slots"].size() > 6)
         return { {"ok", false}, {"error", "Bad training setup"} };
-    // teams of the CPU slots: at least one enemy, at most 3 CPUs on your team (5 units in all)
+    // teams of the CPU slots: at least one enemy, at most 4 CPUs on your team (6 units in all)
     const int ns = (int)t["slots"].size();
-    int team[5] = { 0, 0, 1, 1, 1 }; bool slot_on[5] = { true, true, true, true, false };
+    int team[6] = { 0, 0, 1, 1, 1, 0 }; bool slot_on[6] = { true, true, true, true, false, false };
     int enemies = 0, allies = 0;
     for (int i = 1; i < ns; i++) {
         const json &s = t["slots"][i];
@@ -111,8 +111,8 @@ static json training_apply(const json &t) {
         slot_on[i] = jb(s, "on", i < 4);
         if (slot_on[i]) (team[i] ? enemies : allies)++;
     }
-    if (!enemies || allies > 3) return { {"ok", false}, {"error", "Bad training setup"} };
-    for (int i = 1; i < 5; i++) {
+    if (!enemies || allies > 4) return { {"ok", false}, {"error", "Bad training setup"} };
+    for (int i = 1; i < 6; i++) {
         training_set(("Team" + std::to_string(i + 1)).c_str(), team[i] ? "1" : "0");
         training_set(("On" + std::to_string(i + 1)).c_str(), slot_on[i] ? "1" : "0");
     }
@@ -172,6 +172,11 @@ static int training_selftest(const wchar_t *dir, const wchar_t *out) {
     t14["slots"].push_back({ {"unit", 3001001}, {"level", 4}, {"ex", 3}, {"team", 1}, {"on", true} });
     r["apply1v4"] = training_apply(t14);
     r["state1v4"] = training_get_state()["slots"];
+    json t33 = t14;   // 3v3: slots 2 and 6 on your team
+    t33["slots"][1]["team"] = 0;
+    t33["slots"].push_back({ {"unit", 4001001}, {"level", 2}, {"ex", 0}, {"team", 0}, {"on", true} });
+    r["apply3v3"] = training_apply(t33);
+    r["state3v3"] = training_get_state()["slots"];
     std::string text;
     if (FILE *f = _wfopen(training_ini().c_str(), L"rb")) { char buf[4096]; size_t n; while ((n = fread(buf, 1, sizeof(buf), f)) > 0) text.append(buf, n); fclose(f); }
     r["ini"] = text;

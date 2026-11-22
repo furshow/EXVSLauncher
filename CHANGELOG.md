@@ -5,9 +5,9 @@ section of the released version as the release notes.
 
 ## [Unreleased]
 ### Custom Training
-- **Up to 5 units**: a 4th CPU, so 1v4, 2v3, 3v2 and 4v1 too. **＋ Add CPU** shows while the match has fewer than
-  5 units; your team takes up to 4 (you and 3 CPUs) and the enemy team always keeps one. Needs EXVS Overlay 1.2.2
-  (it adds the 5th unit inside the game). The result screen shows 4 of the 5 units.
+- **Up to 6 units**: two more CPUs, so 1v4 ... 4v1 and 1v5 ... 5v1, 3v3 included. **＋ Add CPU** shows while the
+  match has fewer than 6 units; your team takes up to 5 (you and 4 CPUs) and the enemy team always keeps one.
+  Needs EXVS Overlay 1.2.2 (it adds the extra units inside the game). The result screen shows 4 of the units.
 
 ## [1.3.1] - 2026-11-21
 - Bundles **EXVS Overlay 1.2.1** (Custom Training layouts up to 4 units, result screen and rematch in every layout).
