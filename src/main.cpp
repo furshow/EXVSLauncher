@@ -330,6 +330,7 @@ static const char *overlay_status() {
 static json split_get_state(const json &cfg);   // split.h
 static json training_get_state();                // training.h
 static json replay_get_state();                  // replay.h
+static json steam_get_state();                   // steam.h
 static void split_save_state(const json &sp);
 static json get_state() {
     Ini sl(L"SnowLauncher.ini"), cfg(L"config.ini"), card(L"card.ini"), me(L"EXVSLauncher.ini");
@@ -370,6 +371,7 @@ static json get_state() {
     s["split"] = split_get_state(c);
     s["training"] = training_get_state();
     s["replay"] = replay_get_state();
+    s["steam"] = steam_get_state();
 
     json kb = json::object();
     const char *kb_secs[][2] = { {"client", "Game_Client_Keyboard"}, {"lm", "Game_LM_Keyboard"} };
@@ -1178,6 +1180,7 @@ static json pad_state_di(const std::string &name) {
 #include "training.h"   // Custom Training (custom VS Training matches, run by the overlay)
 #include "replay.h"   // replays on every machine (M1kou's replay patch, loaded by the overlay)
 #include "cardserver.h"   // card server status chip (local or remote)
+#include "steam.h"   // Add to Steam (non-Steam game shortcut, so Steam Input reaches the launcher)
 
 // ---------------------------------------------------------------------------------------------
 // Overlay (embedded EXVS Overlay DLL) and background picture
@@ -1506,6 +1509,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
     if (argc >= 4 && wcscmp(argv[1], L"--training-test") == 0) return training_selftest(argv[2], argv[3]);
     if (argc >= 4 && wcscmp(argv[1], L"--replay-test") == 0) return replay_selftest(argv[2], argv[3]);
     if (argc >= 4 && wcscmp(argv[1], L"--card-test") == 0) return card_selftest(argv[2], argv[3]);
+    if (argc >= 4 && wcscmp(argv[1], L"--steam-test") == 0) return steam_selftest(argv[2], argv[3]);
     if (argc >= 4 && wcscmp(argv[1], L"--split-helper-test") == 0) {
         // --split-helper-test <game dir> <out.json>: the network helper without the UAC prompt (unelevated, so Windows
         // refuses the change): checks the pipe, the PowerShell scripts and the error path. Changes nothing.
@@ -1701,6 +1705,21 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
             return r;
         });
         async("installOverlay", [](json) { return install_overlay(); });
+        async("steamAdd", [&](json) {
+            set_busy("Adding to Steam…");
+            json r = steam_add();
+            set_busy("");
+            if (r.value("ok", false)) last_state["steam"] = r["state"];
+            return r;
+        });
+        async("steamOpen", [&w](json) {
+            if (game_running()) return json({ {"ok", false}, {"error", "Close the game first: the launcher opens again from Steam"} });
+            json r = steam_open();
+            if (!r.value("ok", false)) return r;
+            if (g_mtx) { ReleaseMutex(g_mtx); CloseHandle(g_mtx); g_mtx = NULL; }   // the copy Steam starts must not find this one
+            std::thread([&w] { Sleep(300); w.dispatch([&w] { w.terminate(); }); }).detach();
+            return r;
+        });
         async("openCardServer", [](json) { return open_card_server(); });
         async("removeOverlay", [](json) { return remove_overlay(); });
         w.bind("pickBackground", [](const std::string &) { return pick_background().dump(); });

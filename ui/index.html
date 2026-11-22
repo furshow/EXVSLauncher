@@ -692,11 +692,27 @@ const mock = {
           { input: "keyboard", chipId: "Player1_P3", accessCode: "0000", serial: "Q7mw", monitor: 1 }, { input: "xinput:3", chipId: "Player1_P4", accessCode: "0000", serial: "fa2D", monitor: 1 }],
       pending: { ips: "", iface: "", converted: false } },
     replay: { enabled: false, overlayMin: "1.2.4" },
+    steam: { installed: true, added: false, running: true, fromSteam: false, accounts: 1 },
     training: { licenseAccepted: false, installed: false, enabled: false, randomStage: false, consumeCost: true, teamCost: [0, 8000], overlayMin: "1.2.3",
       slots: [{ unit: 0, level: 0, ex: -1, team: 0, on: true }, { unit: 1001001, level: 2, ex: 0, team: 0, on: true }, { unit: -1, level: 3, ex: 1, team: 1, on: true }, { unit: 601001001, level: 4, ex: 2, team: 1, on: true }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }, { unit: -1, level: 3, ex: 0, team: 1, on: false }, { unit: -1, level: 3, ex: 0, team: 0, on: false }] },
   },
   status: { client: false, lm: false, server: false, n2n: { running: false, connected: false, ip: "" }, log: [], busy: "", training: { state: "nogame", message: "" }, card: { state: "online", local: false, ms: 84, url: "http://card.example.com/" } },
 };
+async function steamAdd() {
+  const st = S.steam || {};
+  if (st.running && !confirm(t("Steam will close and open again to add EXVS Launcher. Continue?"))) return;
+  toast("Adding to Steam…");
+  const r = await call("steamAdd");
+  if (!r || r.ok === false) { toast((r && r.error) || "Could not add EXVS Launcher to Steam", true); return; }
+  if (r.state) S.steam = r.state;
+  toast(r.added ? "Added to Steam" : "Steam shortcut updated");
+  renderOpts();
+}
+async function steamOpen() {
+  const r = await call("steamOpen");
+  if (!r || r.ok === false) toast((r && r.error) || "Could not open Steam", true);
+  else toast("Opening from Steam…");
+}
 async function call(name, ...args) {
   if (HAS_HOST) return window[name](...args);
   switch (name) {
@@ -890,6 +906,20 @@ const CATS = {
     { type: "actions", label: "Background picture", desc: "Picture behind the Play screen (JPG, PNG or WEBP).",
       actions: [["Choose…", async () => { const r = await call("pickBackground"); if (r && r.dataUrl) setBackground(r.dataUrl); else if (r && r.error) toast(r.error, true); }],
                 ["Default", async () => { await call("resetBackground"); setBackground(null); }]] },
+    { section: "Steam" },
+    { type: "actions", label: "Steam library",
+      desc: "Adds EXVS Launcher to your Steam library as a non-Steam game. Opened from Steam, Steam Input reaches the launcher and the game: the Steam Link on-screen controller, a Steam Deck or any pad Steam supports works as an Xbox controller, also in Split screen. In Steam, set the shortcut's controller layout to a gamepad one.",
+      extra: () => { const st = S.steam || {};
+        if (!st.installed) return `<p class="warn">${t("Steam isn't installed on this PC.")}</p>`;
+        let h = st.added ? `<p class="rec">${t("EXVS Launcher is in your Steam library.")}</p>` : "";
+        if (st.fromSteam) h += `<p class="rec">${t("This launcher was opened from Steam: Steam Input is on.")}</p>`;
+        else if (st.added) h += `<p>${t("Opened outside Steam: Steam Input doesn't reach it. Use Open through Steam.")}</p>`;
+        if (st.running) h += `<p>${t("Adding closes Steam and opens it again (Steam only reads its shortcuts when it starts).")}</p>`;
+        return h; },
+      actions: () => { const st = S.steam || {};
+        if (!st.installed) return [];
+        const add = [st.added ? "Update shortcut" : "Add to Steam", () => steamAdd(), st.added ? "" : "primary"];
+        return st.added && !st.fromSteam ? [["Open through Steam", () => steamOpen(), "primary"], add] : [add]; } },
     { section: "Game folder" },
     { type: "actions", label: "Game folder", desc: () => S.gameDir, actions: [["Open folder", () => call("openFolder")]] },
     { type: "actions", label: "Force close the game", desc: "Closes the Client and Live Monitor right away.", actions: [["Close game", async () => { if (confirm(t("Force close the game?"))) await call("stopGame"); }, "danger"]] },
