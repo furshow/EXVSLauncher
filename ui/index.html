@@ -1694,12 +1694,12 @@ function trSlotHtml(i) {
 const TR_CPU_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9], TR_MAX = 10;
 // total team cost per team, typed in: 6000 (the game's, stored as 0) to 99000; the overlay sets it while a match
 // runs with team cost on
-const TR_COST_MIN = 6000, TR_COST_MAX = 99000;
+const TR_COST_MIN = 1500, TR_COST_MAX = 99000, TR_COST_GAME = 6000;   // 6000 = the game's (stored as 0)
 const trCostClamp = v => Math.max(TR_COST_MIN, Math.min(TR_COST_MAX, Math.round(+v || 0)));
 function trCostSel(team) {
   const tr = S.training, v = (tr.teamCost || [0, 0])[team] || 0, off = tr.consumeCost === false;
-  return `<label class="tr-tc" title="${esc(t(off ? "Turn on Team cost to pick each team's cost" : "Total team cost (6000 or more)"))}">${esc(t("Cost"))}` +
-    `<input type="text" inputmode="numeric" maxlength="5" data-tc="${team}" value="${v ? trCostClamp(v) : TR_COST_MIN}"${off ? " disabled" : ""}></label>`;
+  return `<label class="tr-tc" title="${esc(t(off ? "Turn on Team cost to pick each team's cost" : "Total team cost (1500 or more)"))}">${esc(t("Cost"))}` +
+    `<input type="text" inputmode="numeric" maxlength="5" data-tc="${team}" value="${v ? trCostClamp(v) : TR_COST_GAME}"${off ? " disabled" : ""}></label>`;
 }
 const trCpus = team => TR_CPU_SLOTS.filter(i => S.training.slots[i].on !== false && S.training.slots[i].team === team);
 const trCount = () => ({ a: trCpus(0).length, e: trCpus(1).length });
@@ -1733,9 +1733,9 @@ function renderTraining() {
     el.oninput = () => { const d = el.value.replace(/\D/g, "").slice(0, 5); if (d !== el.value) el.value = d; };
     el.onkeydown = e => { if (e.key === "Enter") el.blur(); };
     el.onchange = () => {
-      const v = trCostClamp(el.value);
-      if (String(v) !== el.value) toast(t("Team cost goes from {a} to {b}", { a: TR_COST_MIN, b: TR_COST_MAX }), true);
-      const tc = (S.training.teamCost || [0, 0]).slice(); tc[+el.dataset.tc] = v === TR_COST_MIN ? 0 : v;
+      const v = el.value === "" ? TR_COST_GAME : trCostClamp(el.value);   // empty: back to the game's
+      if (el.value !== "" && String(v) !== el.value) toast(t("Team cost goes from {a} to {b}", { a: TR_COST_MIN, b: TR_COST_MAX }), true);
+      const tc = (S.training.teamCost || [0, 0]).slice(); tc[+el.dataset.tc] = v === TR_COST_GAME ? 0 : v;
       S.training.teamCost = tc; trChanged();
     };
   }
