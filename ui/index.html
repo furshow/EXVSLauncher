@@ -451,7 +451,7 @@ body.pad .pad-hint { display: block; }
     <!-- 2v2 TRAINING -->
     <section class="page" id="page-training">
       <h1>Custom Training <span class="pill off" id="tr-pill">Off</span></h1>
-      <p class="sub">Turn VS Training into a custom match of up to 4 units (1v1 to 3v1): pick your unit and the CPUs of each team, with what each CPU does and its EX type.</p>
+      <p class="sub">Turn VS Training into a custom match of up to 5 units (1v1 to 4v1): pick your unit and the CPUs of each team, with what each CPU does and its EX type.</p>
       <div class="sp-warn" id="tr-ov" hidden><span id="tr-ov-text"></span><button class="btn primary" id="tr-ov-btn"></button></div>
       <div class="tr-lic" id="tr-lic" hidden>
         <div class="tr-lic-ic">!</div>
@@ -682,8 +682,8 @@ const mock = {
       p: [{ input: "xinput:0", chipId: "Player1", accessCode: "0000", serial: "XXXX", monitor: 0 }, { input: "xinput:1", chipId: "Player1_P2", accessCode: "0000", serial: "k3Zp", monitor: 0 },
           { input: "keyboard", chipId: "Player1_P3", accessCode: "0000", serial: "Q7mw", monitor: 1 }, { input: "xinput:3", chipId: "Player1_P4", accessCode: "0000", serial: "fa2D", monitor: 1 }],
       pending: { ips: "", iface: "", converted: false } },
-    training: { licenseAccepted: false, installed: false, enabled: false, randomStage: false, consumeCost: true, overlayMin: "1.2.1",
-      slots: [{ unit: 0, level: 0, ex: -1, team: 0, on: true }, { unit: 1001001, level: 2, ex: 0, team: 0, on: true }, { unit: -1, level: 3, ex: 1, team: 1, on: true }, { unit: 601001001, level: 4, ex: 2, team: 1, on: true }] },
+    training: { licenseAccepted: false, installed: false, enabled: false, randomStage: false, consumeCost: true, overlayMin: "1.2.2",
+      slots: [{ unit: 0, level: 0, ex: -1, team: 0, on: true }, { unit: 1001001, level: 2, ex: 0, team: 0, on: true }, { unit: -1, level: 3, ex: 1, team: 1, on: true }, { unit: 601001001, level: 4, ex: 2, team: 1, on: true }, { unit: -1, level: 3, ex: 0, team: 1, on: false }] },
   },
   status: { client: false, lm: false, server: false, n2n: { running: false, connected: false, ip: "" }, log: [], busy: "", training: { state: "nogame", message: "" }, card: { state: "online", local: false, ms: 84, url: "http://card.example.com/" } },
 };
@@ -1685,9 +1685,11 @@ function trSlotHtml(i) {
     <div class="tr-meta"><div class="who"><span>${esc(trWho(i))}</span>${rm}</div><div class="nm">${esc(name)}${sub ? `<small>${esc(sub)}</small>` : ""}</div><div class="tr-two">${i === 0 ? ex : level + ex}</div></div>
   </div>`;
 }
-// teams: you (slot 0) + 3 CPU slots, each on a team (0 yours, 1 enemy) or out of the match; 4 units at most,
-// at least one enemy. Older settings (a "partner" switch) come in as team / on from the launcher too.
-const trCpus = team => [1, 2, 3].filter(i => S.training.slots[i].on !== false && S.training.slots[i].team === team);
+// teams: you (slot 0) + 4 CPU slots, each on a team (0 yours, 1 enemy) or out of the match; 5 units at most
+// (the 5th runs on the overlay's 5-unit list), at least one enemy. Older settings (a "partner" switch, 3 CPU
+// slots) come in as team / on from the launcher too.
+const TR_CPU_SLOTS = [1, 2, 3, 4], TR_MAX = 5;
+const trCpus = team => TR_CPU_SLOTS.filter(i => S.training.slots[i].on !== false && S.training.slots[i].team === team);
 const trCount = () => ({ a: trCpus(0).length, e: trCpus(1).length });
 const trMode = () => { const c = trCount(); return `${1 + c.a}v${c.e}`; };
 function trWho(i) {   // "You", "Partner" / "Ally 2", "Enemy 1..3", by the card's place in its team
@@ -1699,14 +1701,16 @@ function trMove(i, team) {   // a CPU to a team (or back into the match there); 
   const s = S.training.slots[i], c = trCount();
   if (s.on !== false && s.team === team) return;
   if (s.on !== false && s.team === 1 && c.e === 1) { toast(t("The enemy team needs a CPU"), true); return; }
-  if (team === 0 && c.a >= 2 && !(s.on !== false && s.team === 0)) { toast(t("Your team is full (4 units at most)"), true); return; }
+  if (s.on === false && 1 + c.a + c.e >= TR_MAX) { toast(t("The match is full (5 units at most)"), true); return; }
+  if (team === 0 && c.a >= 3) { toast(t("Your team is full (4 units at most)"), true); return; }
   s.team = team; s.on = true; trChanged(true);
 }
 function renderTraining() {
   const tr = S && S.training; if (!tr) return;
-  for (let i = 1; i < 4; i++) { const s = tr.slots[i]; if (s.team !== 0 && s.team !== 1) s.team = i === 1 ? 0 : 1; if (s.on == null) s.on = true; }
+  while (tr.slots.length < 5) tr.slots.push({ unit: -1, level: 3, ex: 0, team: 1, on: false });   // older launcher state: 3 CPU slots
+  for (const i of TR_CPU_SLOTS) { const s = tr.slots[i]; if (s.team !== 0 && s.team !== 1) s.team = i === 1 ? 0 : 1; if (s.on == null) s.on = i < 4; }
   const c = trCount(), total = 1 + c.a + c.e, mode = trMode();
-  const add = team => total < 4 && !(team === 0 && c.a >= 2) ? `<button class="tr-add" data-add="${team}">＋ ${esc(t("Add CPU"))}</button>` : "";
+  const add = team => total < TR_MAX && !(team === 0 && c.a >= 3) ? `<button class="tr-add" data-add="${team}">＋ ${esc(t("Add CPU"))}</button>` : "";
   $("#tr-field").innerHTML =
     `<div class="tr-team" data-side="0" style="--tc:var(--accent-hi)"><h3>${esc(t("Your team"))}</h3>${trSlotHtml(0)}${trCpus(0).map(trSlotHtml).join("")}${add(0)}</div>
      <div class="tr-vs">${mode === "2v2" ? "VS" : mode}</div>
@@ -1714,7 +1718,7 @@ function renderTraining() {
   for (const b of $$("#tr-field [data-pick]")) b.onclick = () => trOpenPicker(+b.dataset.pick);
   for (const el of $$("#tr-field select[data-tr]")) el.onchange = () => { S.training.slots[+el.dataset.n][el.dataset.tr] = +el.value; trChanged(); };
   for (const b of $$("#tr-field [data-rm]")) b.onclick = () => { const s = S.training.slots[+b.dataset.rm]; if (s.team === 1 && trCount().e === 1) return; s.on = false; trChanged(true); };
-  for (const b of $$("#tr-field [data-add]")) b.onclick = () => { const i = [1, 2, 3].find(k => S.training.slots[k].on === false); if (i) trMove(i, +b.dataset.add); };
+  for (const b of $$("#tr-field [data-add]")) b.onclick = () => { const i = TR_CPU_SLOTS.find(k => S.training.slots[k].on === false); if (i) trMove(i, +b.dataset.add); };
   // drag any CPU card to the other team
   let dragging = 0;
   for (const card of $$("#tr-field [data-cpu]")) {

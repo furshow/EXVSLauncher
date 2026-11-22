@@ -496,6 +496,7 @@
     ["Remove this CPU", "Quitar este CPU", "移除此 CPU", "このCPUを外す"],
     ["The enemy team needs a CPU", "El equipo enemigo necesita un CPU", "敌方队伍至少需要一台 CPU", "敵チームにはCPUが必要です"],
     ["Your team is full (4 units at most)", "Tu equipo está lleno (4 unidades como máximo)", "你的队伍已满（最多 4 台机体）", "自チームはいっぱいです（最大4機）"],
+    ["The match is full (5 units at most)", "La partida está llena (5 unidades como máximo)", "对战已满（最多 5 台机体）", "対戦はいっぱいです（最大5機）"],
     ["Active: VS Training is a {m}", "Activo: el VS Training es un {m}", "已生效：VS 训练为 {m}", "有効：VSトレーニングは{m}"],
     // card server chip
     ["Couldn't open the browser", "No se pudo abrir el navegador", "无法打开浏览器", "ブラウザを開けませんでした"],
@@ -510,7 +511,7 @@
     ["No card server address set (Settings › Account)", "No hay dirección de servidor de tarjetas (Ajustes › Cuenta)", "未设置卡片服务器地址（设置 › 账号）", "カードサーバーのアドレスが未設定です（設定 › アカウント）"],
     // custom training page
     ["Custom Training", "Entrenamiento personalizado", "自定义训练", "カスタムトレーニング"],
-    ["Turn VS Training into a custom match of up to 4 units (1v1 to 3v1): pick your unit and the CPUs of each team, with what each CPU does and its EX type.", "Convierte el VS Training en una partida personalizada de hasta 4 unidades (de 1v1 a 3v1): elige tu unidad y los CPU de cada equipo, con lo que hace cada CPU y su tipo de EX.", "把 VS 训练变成最多 4 台机体的自定义对战（1v1 到 3v1）：选择你的机体和每队的 CPU，并设置每台 CPU 的行为和觉醒类型。", "VSトレーニングを最大4機のカスタム対戦（1on1〜3on1）に：自機と各チームのCPUを選び、それぞれのCPUの行動と覚醒タイプを設定します。"],
+    ["Turn VS Training into a custom match of up to 5 units (1v1 to 4v1): pick your unit and the CPUs of each team, with what each CPU does and its EX type.", "Convierte el VS Training en una partida personalizada de hasta 5 unidades (de 1v1 a 4v1): elige tu unidad y los CPU de cada equipo, con lo que hace cada CPU y su tipo de EX.", "把 VS 训练变成最多 5 台机体的自定义对战（1v1 到 4v1）：选择你的机体和每队的 CPU，并设置每台 CPU 的行为和觉醒类型。", "VSトレーニングを最大5機のカスタム対戦（1on1〜4on1）に：自機と各チームのCPUを選び、それぞれのCPUの行動と覚醒タイプを設定します。"],
     ["Free, non-commercial add-on by aerial", "Complemento gratuito y no comercial de aerial", "aerial 制作的免费非商业扩展", "aerial による無料・非商用の拡張"],
     ["Custom Training runs on the bridge of aerial's \"2v2 Training Extension\" 1.1. It's free for non-commercial use under the author's license. Never pay for it: if someone charges you for it, report it in the author's QQ group 1132405231.", "El Entrenamiento personalizado usa el puente del \"2v2 Training Extension\" 1.1 de aerial. Es gratis para uso no comercial según la licencia del autor. Nunca pagues por él: si alguien te lo cobra, denúncialo en el grupo QQ del autor 1132405231.", "自定义训练使用 aerial 的「2v2 训练扩展」1.1 的桥接组件，按作者许可免费用于非商业用途。请勿付费获取：如有人向你收费，请在作者的 QQ 群 1132405231 举报。", "カスタムトレーニングは aerial の「2v2 Training Extension」1.1 のブリッジで動作します。作者のライセンスにより非商用で無料です。有料で入手しないでください。料金を請求された場合は作者の QQ グループ 1132405231 に報告してください。"],
     ["Read the license", "Leer la licencia", "阅读许可", "ライセンスを読む"],
