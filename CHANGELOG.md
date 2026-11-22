@@ -3,6 +3,18 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
+## [1.4.0] - 2026-11-22
+- Bundles **EXVS Overlay 1.2.4** (loads the replay patch).
+### Replays
+- **Replays on every machine** (Settings > Gameplay > Replays): the game keeps a match replay only on the machine it
+  sends to the Live Monitor; with this on, every machine keeps its own copy in the game's replay list (and the Live
+  Monitor adds loose replays to its list). Like the game, only matches with 4 human players are recorded. It uses
+  **M1kou**'s "EXVS multi-function patch" (20261028), shipped unmodified with the author's permission: turning it on
+  writes `Replay\` in the game folder (`EXVSReplay.dll` and its settings, with its input blocking and time rental
+  free play bypass off), and EXVS Overlay 1.2.4 loads it. Thanks to M1kou.
+### Credits
+- Special thanks: SnowLauncher by Snow, aerial, M1kou, the ESVS2IB 4P launcher and the EXVS community.
+
 ## [1.3.3] - 2026-11-22
 - Bundles **EXVS Overlay 1.2.3** (team cost per team in Custom Training).
 ### Custom Training
