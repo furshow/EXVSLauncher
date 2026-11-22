@@ -5,8 +5,8 @@ section of the released version as the release notes.
 
 ## [Unreleased]
 ### Custom Training
-- **Team cost per team**: each team on the **Custom** page has a cost menu (game's 6000, or 2000 to 30000), for
-  matches like 1v2 with more cost for you. Needs **Team cost** on and EXVS Overlay 1.2.3.
+- **Team cost per team**: each team on the **Custom** page has a cost box (numbers only, 6000 to 99000; 6000 is the
+  game's), for matches like 1v2 with more cost for you. Needs **Team cost** on and EXVS Overlay 1.2.3.
 
 ## [1.3.2] - 2026-11-22
 - Bundles **EXVS Overlay 1.2.2** (Custom Training matches of 5 to 10 units).

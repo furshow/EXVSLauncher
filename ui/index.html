@@ -308,7 +308,9 @@ body.pad .pad-hint { display: block; }
 .tr-field .tr-vs { align-self: center; }
 .tr-team { display: grid; gap: 12px; }
 .tr-team h3 { margin: 0 0 -2px 2px; font: 600 11.5px var(--head); letter-spacing: 2.2px; text-transform: uppercase; color: var(--tc); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.tr-team h3 .tr-tc { width: auto; min-width: 0; padding: 3px 6px; font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text); }
+.tr-team h3 .tr-tc { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 1.4px; color: var(--muted); }
+.tr-team h3 .tr-tc input { width: 74px; min-width: 0; padding: 3px 7px; font-size: 12.5px; font-weight: 500; letter-spacing: 0; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+.tr-team h3 .tr-tc input:disabled { opacity: .45; }
 .tr-vs { text-align: center; font: italic 700 30px var(--head); letter-spacing: 1px; color: #fff; text-shadow: 0 0 16px var(--accent-glow), 0 0 26px rgba(255,61,85,0.45); }
 .tr-slot { position: relative; display: grid; grid-template-columns: 171px minmax(0, 1fr); gap: 14px; padding: 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); transition: border-color .15s; }
 .tr-slot::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tc); box-shadow: 0 0 10px var(--tc); }
@@ -1690,13 +1692,14 @@ function trSlotHtml(i) {
 // (the 5th to 10th run on the overlay's longer unit list), at least one enemy. Older settings (a "partner"
 // switch, 3-5 CPU slots) come in as team / on from the launcher too.
 const TR_CPU_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9], TR_MAX = 10;
-// total team cost per team (0 = the game's 6000); the overlay sets it while a match runs with team cost on
-const TR_TEAM_COSTS = [0, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 15000, 20000, 30000];
+// total team cost per team, typed in: 6000 (the game's, stored as 0) to 99000; the overlay sets it while a match
+// runs with team cost on
+const TR_COST_MIN = 6000, TR_COST_MAX = 99000;
+const trCostClamp = v => Math.max(TR_COST_MIN, Math.min(TR_COST_MAX, Math.round(+v || 0)));
 function trCostSel(team) {
-  const tr = S.training, v = (tr.teamCost || [0, 0])[team] || 0, list = TR_TEAM_COSTS.includes(v) ? TR_TEAM_COSTS : TR_TEAM_COSTS.concat(v);
-  const off = tr.consumeCost === false;
-  return `<select class="tr-tc" data-tc="${team}"${off ? " disabled" : ""} title="${esc(t(off ? "Turn on Team cost to pick each team's cost" : "Total team cost"))}">` +
-    list.map(c => `<option value="${c}"${c === v ? " selected" : ""}>${esc(c ? t("Cost {n}", { n: c }) : t("Cost 6000 (game)"))}</option>`).join("") + "</select>";
+  const tr = S.training, v = (tr.teamCost || [0, 0])[team] || 0, off = tr.consumeCost === false;
+  return `<label class="tr-tc" title="${esc(t(off ? "Turn on Team cost to pick each team's cost" : "Total team cost (6000 or more)"))}">${esc(t("Cost"))}` +
+    `<input type="text" inputmode="numeric" maxlength="5" data-tc="${team}" value="${v ? trCostClamp(v) : TR_COST_MIN}"${off ? " disabled" : ""}></label>`;
 }
 const trCpus = team => TR_CPU_SLOTS.filter(i => S.training.slots[i].on !== false && S.training.slots[i].team === team);
 const trCount = () => ({ a: trCpus(0).length, e: trCpus(1).length });
@@ -1726,7 +1729,16 @@ function renderTraining() {
      <div class="tr-team en" data-side="1" style="--tc:#ff7083"><h3><span>${esc(t("Enemy team"))}</span>${trCostSel(1)}</h3>${trCpus(1).map(trSlotHtml).join("")}${add(1)}</div>`;
   for (const b of $$("#tr-field [data-pick]")) b.onclick = () => trOpenPicker(+b.dataset.pick);
   for (const el of $$("#tr-field select[data-tr]")) el.onchange = () => { S.training.slots[+el.dataset.n][el.dataset.tr] = +el.value; trChanged(); };
-  for (const el of $$("#tr-field select[data-tc]")) el.onchange = () => { const tc = (S.training.teamCost || [0, 0]).slice(); tc[+el.dataset.tc] = +el.value; S.training.teamCost = tc; trChanged(); };
+  for (const el of $$("#tr-field input[data-tc]")) {   // digits only; below 6000 / above 99000 snaps back when you leave the box
+    el.oninput = () => { const d = el.value.replace(/\D/g, "").slice(0, 5); if (d !== el.value) el.value = d; };
+    el.onkeydown = e => { if (e.key === "Enter") el.blur(); };
+    el.onchange = () => {
+      const v = trCostClamp(el.value);
+      if (String(v) !== el.value) toast(t("Team cost goes from {a} to {b}", { a: TR_COST_MIN, b: TR_COST_MAX }), true);
+      const tc = (S.training.teamCost || [0, 0]).slice(); tc[+el.dataset.tc] = v === TR_COST_MIN ? 0 : v;
+      S.training.teamCost = tc; trChanged();
+    };
+  }
   for (const b of $$("#tr-field [data-rm]")) b.onclick = () => { const s = S.training.slots[+b.dataset.rm]; if (s.team === 1 && trCount().e === 1) return; s.on = false; trChanged(true); };
   for (const b of $$("#tr-field [data-add]")) b.onclick = () => { const i = TR_CPU_SLOTS.find(k => S.training.slots[k].on === false); if (i) trMove(i, +b.dataset.add); };
   // drag any CPU card to the other team
