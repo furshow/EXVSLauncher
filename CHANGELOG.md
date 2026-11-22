@@ -3,6 +3,12 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
+## [1.4.1] - 2026-11-22
+- Bundles **EXVS Overlay 1.2.4** (unchanged).
+### Fixes
+- **Settings toggles**: turning a toggle off (Quick skin change, Frame rate limit and the others) works on the first
+  click again. It stayed ON on screen and wasn't saved until another setting changed.
+
 ## [1.4.0] - 2026-11-22
 - Bundles **EXVS Overlay 1.2.4** (loads the replay patch).
 ### Replays
