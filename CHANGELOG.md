@@ -3,6 +3,18 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
+## [1.6.0] - 2026-11-23
+- Bundles **EXVS Overlay 1.2.5** (Custom Training works with clone units). Custom Training needs it.
+### Custom Training
+- **NPCs**: the game's 150 CPU units (the grunts of the CPU battles: Byarlant, Char's Z'Gok, GINN, Jegan, Geara
+  Zulu...) are in the unit list, in their own **NPCs** tab, with a picture made from their VS art. No mod is needed
+  (like the bosses). The ones whose moveset lacks some player movements show "may not work" (!) when you play them.
+  Enabled NPC mods of the Mod Manager are not listed twice.
+- **Clone units** of the Mod Manager's enabled clone mods are in the unit list (their own "Mods" tab, and in the
+  cost tabs), with the base unit's picture and the clone's cost. Needs EXVS Overlay 1.2.5 to start with clones on.
+- Fixed costs in the unit list: Char's Zaku II 1500, ZZ Gundam 3000, Qubeley 3000, Full Armor ZZ Gundam 2500 and
+  Gundam 00 Diver Ace 2000 (they now match the game's cost table).
+
 ## [1.5.0] - 2026-11-22
 - Bundles **EXVS Overlay 1.2.4** (unchanged).
 ### Steam

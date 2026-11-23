@@ -18,7 +18,7 @@
 //   the bridge's 4); TeamCost1 / TeamCost2 (total team cost of your team / the enemy team, 1500-99000, 0 = the
 //   game's 6000; with ConsumeCost on, overlay 1.2.3+); Partner (slot 2 only: 1 ally, 0 out, 2 enemy) for overlays older than 1.2.1.
 
-static const char *TRAINING_OVERLAY_MIN = "1.2.3";
+static const char *TRAINING_OVERLAY_MIN = "1.2.5";
 static const int TRAINING_MAX_UNITS = 10;   // you + 9 CPU slots (the overlay adds the units past the bridge's 4)
 static const char *TRAINING_LICENSE_ID = "aerial-noncommercial-1.0";
 
@@ -67,6 +67,54 @@ static void training_set(const char *key, const std::string &v) {
     WritePrivateProfileStringW(L"Training", widen(key).c_str(), widen(v).c_str(), training_ini().c_str());
 }
 
+static std::string training_read_text(const std::wstring &p) {
+    HANDLE f = CreateFileW(p.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    if (f == INVALID_HANDLE_VALUE) return "";
+    std::string s; char buf[16384]; DWORD got;
+    while (s.size() < (4u << 20) && ReadFile(f, buf, sizeof(buf), &got, NULL) && got) s.append(buf, got);
+    CloseHandle(f);
+    if (s.size() >= 3 && (unsigned char)s[0] == 0xEF && (unsigned char)s[1] == 0xBB && (unsigned char)s[2] == 0xBF) s.erase(0, 3);
+    return s;
+}
+
+// Units the Mod Manager's enabled clone mods add (mods\mod_manager.json "enabled", mods\<mod>\mod.json "mode":
+// "clone"): [{id, name, base, cost}]. base = the unit whose art the clone uses (the original, or the donor of a
+// hidden unit); cost = the moveset editor's cost, 0 = the base unit's (hidden units: their own, the page knows
+// it). Bosses made playable are left out: the list already has them.
+static json training_mod_units() {
+    json out = json::array();
+    std::wstring dir = g_dir + L"mods\\";
+    json mm = json::parse(training_read_text(dir + L"mod_manager.json"), nullptr, false);
+    if (!mm.is_object() || !mm.contains("enabled") || !mm["enabled"].is_array()) return out;
+    for (auto &e : mm["enabled"]) {
+        if (!e.is_string()) continue;
+        std::string name = e.get<std::string>();
+        if (name.empty() || name.find_first_of("\\/:") != std::string::npos || name == "." || name == "..") continue;
+        json m = json::parse(training_read_text(dir + widen(name) + L"\\mod.json"), nullptr, false);
+        if (!m.is_object() || !m.contains("clone") || !m["clone"].is_object()) continue;
+        try {   // a hand-edited mod.json with odd types is skipped
+        if (m.value("mode", "") != "clone") continue;
+        const json &c = m["clone"];
+        if (c.value("boss", false) || c.value("npc", false)) continue;   // bosses and NPCs: the list has them
+        int id = c.value("id", 0), unit = c.value("unit", 0);
+        if (id <= 0 || id > 99999999 || unit <= 0) continue;
+        bool hidden = c.value("hidden", false);
+        int base = hidden ? c.value("donor", unit) : unit, cost = 0;
+        if (c.contains("moveset") && c["moveset"].is_object()) {
+            const json &mv = c["moveset"];
+            if (mv.contains("edit") && mv["edit"].is_object() && mv["edit"].contains("unit") && mv["edit"]["unit"].is_object()) {
+                const json &u = mv["edit"]["unit"];
+                if (u.contains("cost") && u["cost"].is_number()) cost = u["cost"].get<int>();
+            }
+        }
+        std::string label = c.value("name", "");
+        if (label.empty()) label = m.value("name", name);
+        out.push_back({ {"id", id}, {"name", label}, {"base", base}, {"cost", cost}, {"hidden", hidden} });
+        } catch (const std::exception &) {}
+    }
+    return out;
+}
+
 static json training_get_state() {
     Ini me(L"EXVSLauncher.ini");
     json slots = json::array();
@@ -88,7 +136,7 @@ static json training_get_state() {
              {"enabled", training_get("Enabled", 0) != 0}, {"slots", slots},
              {"randomStage", training_get("RandomStage", 0) != 0}, {"consumeCost", training_get("ConsumeCost", 1) != 0},
              {"teamCost", json::array({ training_get("TeamCost1", 0), training_get("TeamCost2", 0) })},
-             {"overlayMin", TRAINING_OVERLAY_MIN} };
+             {"modUnits", training_mod_units()}, {"overlayMin", TRAINING_OVERLAY_MIN} };
 }
 
 // {enabled, slots:[{unit,level,ex,team,on}x10 (x4-6 from older pages)], randomStage, consumeCost, teamCost:[yours,

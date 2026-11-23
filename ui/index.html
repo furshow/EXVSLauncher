@@ -363,6 +363,8 @@ body.pad .pad-hint { display: block; }
 .tr-grid .im.sym { display: grid; place-items: center; font: 700 26px var(--head); color: var(--muted); background: repeating-linear-gradient(135deg, #0d1322 0 10px, #0b101c 10px 20px); }
 .tr-grid .lb { padding: 4px 8px 5px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tr-grid .lb small { color: var(--dim); margin-left: 4px; }
+.tr-grid .lb small b.warn { font-size: 10px; font-weight: 700; color: #ffb547; }
+.tr-grid .lb small b.mod { font-size: 9px; font-weight: 700; color: var(--accent, #2f8cff); letter-spacing: .5px; }
 .tr-grid .none { grid-column: 1 / -1; color: var(--dim); text-align: center; padding: 30px; }
 @media (max-width: 1100px) { .tr-field { grid-template-columns: 1fr; } .tr-vs { padding: 2px 0; } }
 </style>
@@ -722,6 +724,7 @@ async function call(name, ...args) {
       notes: "## What's new\n- **Automatic updates** for the launcher and the overlay.\n- Fixes.\n\nThanks for playing!" };
     case "padState": { const ph = Math.floor(performance.now() / 600) % 8; return { connected: true, buttons: [ph + 1], pov: ph * 45, x: 0, y: 0 }; }
     case "splitPads": { const ph = Math.floor(performance.now() / 900) % 4; return { xinput: [0, 1, 2, 3].map(i => ({ slot: i, connected: i < 2, pressed: i === ph && i < 2 })), devices: [{ id: "hid:mock-dualsense-1", name: "DualSense Wireless Controller", label: "DualSense Wireless Controller #1", pressed: ph === 2 }, { id: "hid:mock-dualsense-2", name: "DualSense Wireless Controller", label: "DualSense Wireless Controller #2", pressed: ph === 3 }] }; }
+    case "trainingNpcs": return fetch("../../ui/training_npcs.json").then(r => r.json()).catch(() => []);
     case "trainingLicense": return { text: "Server-Infinite 2v2 训练扩展\naerial 非商业使用许可 v1.0\n(mock)" };
     case "listControllers": return [{ name: "Controller (Xbox One For Windows)", xinput: true }, { name: "Wireless Controller", xinput: false }];
     default: return { ok: true };
@@ -1694,12 +1697,28 @@ function spStatus(st) {
 }
 
 // ================================================================ custom training page
-const TR_UNITS = window.TRAINING_UNITS || [];   // [id, name, cost, group, thumb]
+// [id, name, cost, group, thumb(, may not work)]: aerial's list + the game's CPU units (NPCs, group "npc",
+// added by trLoadNpcs: they come from the host, too big to be in the page)
+const TR_UNITS = (window.TRAINING_UNITS || []).slice();
 const TR_BY_ID = new Map(TR_UNITS.map(u => [u[0], u]));
 const TR_POOL = TR_UNITS.filter(u => u[3] === "normal").map(u => u[0]);   // "Random" picks among these
 const TR_EX = ["F · Fighting", "S · Shooting", "E · Extend"];
 const TR_CPU = ["Stand still", "Easy", "Normal", "Hard", "Extreme", "Walk", "Evade", "Low jump", "Mid jump", "High jump"];   // bridge "level" values 0-9
-const TR_COSTS = [["All", null], ["3000", 3000], ["2500", 2500], ["2000", 2000], ["1500", 1500], ["Boss / CPU", "boss"]];
+const TR_COSTS = [["All", null], ["3000", 3000], ["2500", 2500], ["2000", 2000], ["1500", 1500], ["Boss / CPU", "boss"], ["NPCs", "npc"], ["Mods", "mod"]];
+const TR_EXTRA_COSTS = window.TRAINING_EXTRA_COSTS || {};
+// clone units of the Mod Manager's enabled clone mods (getState training.modUnits): group "mod", the base unit's
+// art, the moveset editor's cost or the base unit's (a hidden unit: its own)
+function trSetModUnits(mods) {
+  for (let i = TR_UNITS.length - 1; i >= 0; i--) if (TR_UNITS[i][3] === "mod") { TR_BY_ID.delete(TR_UNITS[i][0]); TR_UNITS.splice(i, 1); }
+  for (const m of mods || []) {
+    if (!m || !m.id || (TR_BY_ID.has(m.id) && TR_BY_ID.get(m.id)[3] !== "mod")) continue;
+    const base = TR_BY_ID.get(m.base);
+    const cost = m.cost || (m.hidden ? TR_EXTRA_COSTS[m.id] : 0) || (TR_BY_ID.get(m.base) || [])[2] || TR_EXTRA_COSTS[m.base] || 0;
+    const u = [m.id, String(m.name || m.id), cost, "mod", base ? base[4] : ""];
+    TR_UNITS.push(u); TR_BY_ID.set(m.id, u);
+  }
+}
+const trCostText = u => u[3] === "normal" || u[3] === "mod" ? String(u[2] || "?") : t(u[3] === "boss" ? "Boss" : u[3] === "npc" ? "NPC" : "CPU");
 let trTimer = 0, trPickSlot = -1, trCost = 0, trState = { state: "nogame", message: "" };
 
 const trModal = () => ["#tr-pick", "#tr-licbox"].map(s => $(s)).find(el => el.style.display !== "none") || null;
@@ -1718,7 +1737,7 @@ function trUnitLabel(id, slot) {   // [name, small text, thumbnail ("" = none)]
   if (cat) return [t(cat[1]), t("a new unit every match"), ""];
   if (id === -1 || !TR_BY_ID.has(id)) return [t("Random"), t("a new unit every match"), ""];
   const u = TR_BY_ID.get(id);
-  return [u[1], u[3] === "normal" ? String(u[2]) : t(u[3] === "boss" ? "Boss" : "CPU"), u[4]];
+  return [u[1], u[3] === "mod" ? t("Mods") + " · " + trCostText(u) : trCostText(u) + (u[5] ? " · " + t("may not work") : ""), u[4]];
 }
 function trSlotHtml(i) {
   const s = S.training.slots[i];
@@ -1763,8 +1782,17 @@ function trMove(i, team) {   // a CPU to a team (or back into the match there); 
   if (team === 0 && c.a >= TR_MAX - 2) { toast(t("Your team is full (9 units at most)"), true); return; }
   s.team = team; s.on = true; trChanged(true);
 }
+async function trLoadNpcs() {
+  let list = [];
+  try { list = await call("trainingNpcs"); } catch (e) { list = []; }
+  for (const u of Array.isArray(list) ? list : [])
+    if (Array.isArray(u) && u[3] === "npc" && !TR_BY_ID.has(u[0])) { TR_UNITS.push(u); TR_BY_ID.set(u[0], u); }
+  if (S && S.training) renderTraining();
+  if ($("#tr-pick") && $("#tr-pick").style.display !== "none") trRenderPicker();
+}
 function renderTraining() {
   const tr = S && S.training; if (!tr) return;
+  trSetModUnits(tr.modUnits);
   while (tr.slots.length < TR_MAX) tr.slots.push({ unit: -1, level: 3, ex: 0, team: tr.slots.length % 2 ? 0 : 1, on: false });   // older launcher state: 3-5 CPU slots
   for (const i of TR_CPU_SLOTS) { const s = tr.slots[i]; if (s.team !== 0 && s.team !== 1) s.team = i === 1 ? 0 : 1; if (s.on == null) s.on = i < 4; }
   const c = trCount(), total = 1 + c.a + c.e, mode = trMode();
@@ -1864,12 +1892,12 @@ function trRenderPicker() {
   $("#tr-costs").innerHTML = TR_COSTS.map(([l], i) => `<button data-c="${i}"${i === trCost ? ' class="on"' : ""}>${esc(t(l))}</button>`).join("");
   for (const b of $$("#tr-costs button")) b.onclick = () => { trCost = +b.dataset.c; trRenderPicker(); };
   const q = $("#tr-search").value.trim().toLowerCase(), c = TR_COSTS[trCost][1], cur = S.training.slots[trPickSlot].unit;
-  const list = TR_UNITS.filter(u => (c === null || (c === "boss" ? u[3] !== "normal" : u[3] === "normal" && u[2] === c)) && (!q || u[1].toLowerCase().includes(q)));
-  const cats = TR_CATS.filter(([id]) => c === null || (c === "boss" ? id === -9 : id === -c)).map(([id, l]) => [id, t(l)]);
+  const list = TR_UNITS.filter(u => (c === null || (c === "boss" ? u[3] === "boss" || u[3] === "cpu" : c === "mod" || c === "npc" ? u[3] === c : (u[3] === "normal" || u[3] === "mod") && u[2] === c)) && (!q || u[1].toLowerCase().includes(q)));
+  const cats = TR_CATS.filter(([id]) => c === null || (c === "boss" ? id === -9 : typeof c === "number" && id === -c)).map(([id, l]) => [id, t(l)]);
   const special = q ? [] : (c === null ? (trPickSlot === 0 ? [[0, t("Picked in game")]] : []).concat([[-1, t("Random")]]) : []).concat(cats);
   $("#tr-grid").innerHTML =
     special.map(([id, l]) => `<button data-id="${id}"${id === cur ? ' class="on"' : ""}><span class="im sym">${id === -1 ? "?" : id === -9 ? "B?" : id < -1 ? -id + "?" : "✦"}</span><div class="lb">${esc(l)}</div></button>`).join("") +
-    list.map(u => `<button data-id="${u[0]}"${u[0] === cur ? ' class="on"' : ""}><span class="im" style="background-image:url('${u[4]}')"></span><div class="lb">${esc(u[1])}<small>${u[3] === "normal" ? u[2] : esc(t(u[3] === "boss" ? "Boss" : "CPU"))}</small></div></button>`).join("") +
+    list.map(u => `<button data-id="${u[0]}"${u[0] === cur ? ' class="on"' : ""}><span class="im" style="background-image:url('${u[4]}')"></span><div class="lb">${esc(u[1])}<small>${esc(trCostText(u))}${u[3] === "mod" ? ' <b class="mod">MOD</b>' : ""}${u[5] ? ` <b class="warn" title="${esc(t("may not work"))}">!</b>` : ""}</small></div></button>`).join("") +
     (list.length || special.length ? "" : `<div class="none">${esc(t("No unit matches"))}</div>`);
   for (const b of $$("#tr-grid button")) b.onclick = () => { S.training.slots[trPickSlot].unit = +b.dataset.id; trCloseModals(); trChanged(true); };
 }
@@ -2055,7 +2083,8 @@ requestAnimationFrame(padLoop);
   const st = $("#n2n-static"); st.checked = !S.n2n.dhcp; st.onchange = () => { S.n2n.dhcp = !st.checked; changed(); };
   renderCats(); renderOpts(); renderQuick(); renderOverlayBanner(); renderSplit(); renderTraining();
   setBackground(S.background);
-  setTimeout(() => call("uiReady"), 30);   // the host shows the window (and closes its splash) once the page is drawn
+  setTimeout(() => call("uiReady"), 30);
+  trLoadNpcs();   // the host shows the window (and closes its splash) once the page is drawn
   const mmOk = !!S.files.modManager;
   $("#mm-open").disabled = !mmOk; $("#mm-sync").disabled = !mmOk; $("#sync-mods").disabled = !mmOk;
   if (!mmOk) $("#mm-status").textContent = t("EXVSIB_Mod_Manager.exe isn't in the game folder");

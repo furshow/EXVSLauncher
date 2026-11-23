@@ -34,7 +34,7 @@
 #include "overlay_version.h"   // OVERLAY_BUNDLED_VERSION, generated from ../EXVSOverlay/src/menu.h
 
 using json = nlohmann::json;
-static const char *VERSION = "1.5.0";
+static const char *VERSION = "1.6.0";
 
 // ---------------------------------------------------------------------------------------------
 // strings / paths
@@ -1731,6 +1731,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
         w.bind("trainingAccept", [](const std::string &) {
             Ini(L"EXVSLauncher.ini").set("Training", "LicenseAccepted", TRAINING_LICENSE_ID);
             return std::string("{\"ok\":true}");
+        });
+        w.bind("trainingNpcs", [](const std::string &) {   // the game's CPU units for the unit list (ui/training_npcs.json)
+            HRSRC r = FindResourceW(NULL, L"TRAINING_NPCS", MAKEINTRESOURCEW(10));
+            std::string text = r ? std::string((const char *)LockResource(LoadResource(NULL, r)), SizeofResource(NULL, r)) : "";
+            if (text.size() >= 3 && (unsigned char)text[0] == 0xEF) text = text.substr(3);
+            return text.empty() ? std::string("[]") : text;
         });
         w.bind("trainingLicense", [](const std::string &) {   // the license text (Chinese, as published)
             HRSRC r = FindResourceW(NULL, L"TRAINING_LICENSE", MAKEINTRESOURCEW(10));

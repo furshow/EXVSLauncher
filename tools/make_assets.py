@@ -24,6 +24,9 @@ html = html.replace('<script src="i18n.js"></script>', "<script>\n" + i18n + "\n
 units = open(os.path.join(root, "ui", "training_units.js"), encoding="utf-8").read()   # tools/make_training_units.py
 assert "</script" not in units
 html = html.replace('<script src="training_units.js"></script>', "<script>\n" + units + "\n</script>")
+# (the NPC list, ui/training_npcs.json, is a resource of the exe: the page asks for it with trainingNpcs.
+# The page is set with NavigateToString, which shows a blank window when the HTML is about 1.8 MB or more.)
+assert len(html.encode("utf-8")) < 1_600_000, "ui.html too big for WebView2 NavigateToString"
 open(os.path.join(gen, "ui.html"), "w", encoding="utf-8", newline="\n").write(html)
 
 DELIM = "EXVSUI"
