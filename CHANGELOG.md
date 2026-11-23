@@ -3,6 +3,12 @@
 All notable changes to EXVS Launcher. The release workflow (.github/workflows/build-release.yml) uses the
 section of the released version as the release notes.
 
+## [1.6.1] - 2026-11-23
+- Bundles **EXVS Overlay 1.2.6** (Custom Training plays NPCs in every slot). Custom Training needs it.
+### Custom Training
+- **NPCs for you or the first 3 CPUs** came out as the training's default RX-78s (only CPUs 5-10 got their NPC).
+  Fixed by EXVS Overlay 1.2.6, now the minimum version for Custom Training.
+
 ## [1.6.0] - 2026-11-23
 - Bundles **EXVS Overlay 1.2.5** (Custom Training works with clone units). Custom Training needs it.
 ### Custom Training
