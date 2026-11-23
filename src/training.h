@@ -18,7 +18,7 @@
 //   the bridge's 4); TeamCost1 / TeamCost2 (total team cost of your team / the enemy team, 1500-99000, 0 = the
 //   game's 6000; with ConsumeCost on, overlay 1.2.3+); Partner (slot 2 only: 1 ally, 0 out, 2 enemy) for overlays older than 1.2.1.
 
-static const char *TRAINING_OVERLAY_MIN = "1.2.3";
+static const char *TRAINING_OVERLAY_MIN = "1.2.5";
 static const int TRAINING_MAX_UNITS = 10;   // you + 9 CPU slots (the overlay adds the units past the bridge's 4)
 static const char *TRAINING_LICENSE_ID = "aerial-noncommercial-1.0";
 
